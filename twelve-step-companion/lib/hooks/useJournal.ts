@@ -1,0 +1,101 @@
+/**
+ * Journal Hook
+ * Manages journal entries with encryption
+ */
+
+import { useEffect, useCallback } from 'react';
+import { useJournalStore } from '../store';
+import type { JournalType } from '../types';
+
+export function useJournal() {
+  const {
+    entries,
+    currentEntry,
+    decryptedContent,
+    isLoading,
+    error,
+    filterType,
+    searchQuery,
+    loadEntries,
+    loadEntry,
+    createEntry,
+    deleteEntry,
+    decryptEntry,
+    setFilterType,
+    setSearchQuery,
+    clearCurrentEntry,
+  } = useJournalStore();
+
+  // Load entries on mount
+  useEffect(() => {
+    loadEntries();
+  }, [loadEntries]);
+
+  // Filter entries by search query (client-side, on decrypted excerpts)
+  const filteredEntries = entries; // TODO: Implement search when we have decrypted excerpts
+
+  // Create a new entry
+  const createNewEntry = useCallback(
+    async (
+      type: JournalType,
+      content: string,
+      options?: {
+        moodBefore?: number;
+        moodAfter?: number;
+        cravingLevel?: number;
+        emotionTags?: string[];
+        stepNumber?: number;
+        meetingId?: string;
+      }
+    ) => {
+      return await createEntry(type, content, options);
+    },
+    [createEntry]
+  );
+
+  // Get entry type display name
+  const getTypeLabel = useCallback((type: JournalType): string => {
+    switch (type) {
+      case 'freeform':
+        return 'Freeform';
+      case 'step-work':
+        return 'Step Work';
+      case 'meeting-reflection':
+        return 'Meeting Reflection';
+      case 'daily-checkin':
+        return 'Daily Check-in';
+      case 'voice':
+        return 'Voice Journal';
+      default:
+        return type;
+    }
+  }, []);
+
+  // Format audio duration
+  const formatDuration = useCallback((seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }, []);
+
+  return {
+    entries: filteredEntries,
+    currentEntry,
+    decryptedContent,
+    isLoading,
+    error,
+    filterType,
+    searchQuery,
+    loadEntries,
+    loadEntry,
+    createEntry: createNewEntry,
+    deleteEntry,
+    decryptEntry,
+    setFilterType,
+    setSearchQuery,
+    clearCurrentEntry,
+    getTypeLabel,
+    formatDuration,
+  };
+}
+
