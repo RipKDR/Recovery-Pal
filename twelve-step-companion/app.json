@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Recovery Companion",
-    "slug": "twelve-step-companion",
+    "slug": "12-step-companion-",
     "version": "1.0.0",
     "description": "Your private recovery journey companion. Track sobriety, journal your thoughts, and access crisis resources — all completely offline with zero data collection.",
     "orientation": "portrait",
@@ -29,7 +29,9 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ],
         "NSPrivacyCollectedDataTypes": [],
@@ -49,7 +51,8 @@
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
         "android.permission.RECORD_AUDIO",
-        "android.permission.VIBRATE"
+        "android.permission.VIBRATE",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -91,10 +94,11 @@
     },
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
-      }
+        "projectId": "0d7f3eb6-afef-4a26-ba85-fb18459927db"
+      },
+      "router": {}
     },
-    "owner": "REPLACE_WITH_EXPO_USERNAME",
+    "owner": "ripkdr",
     "runtimeVersion": {
       "policy": "appVersion"
     },
