@@ -14,14 +14,18 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Card } from '../../components/ui';
 import { useSettingsStore, useProfileStore, useAuthStore } from '../../lib/store';
 import { clearAllData } from '../../lib/db/client';
 import { clearEncryptionKey } from '../../lib/encryption';
 import { exportAndShare, getExportStats } from '../../lib/export';
+import type { ProgramType, CrisisRegion } from '../../lib/types';
+import { getAvailableRegions } from '../../lib/constants/crisisResources';
 
 interface SettingRowProps {
   icon: string;
@@ -98,10 +102,17 @@ function SettingRow({
   return content;
 }
 
+const PROGRAM_OPTIONS: { value: ProgramType; label: string }[] = [
+  { value: '12-step-aa', label: 'Alcoholics Anonymous' },
+  { value: '12-step-na', label: 'Narcotics Anonymous' },
+  { value: 'smart', label: 'SMART Recovery' },
+  { value: 'custom', label: 'Custom Program' },
+];
+
 export default function SettingsScreen() {
   const router = useRouter();
-  const { settings, updateSettings, setNotificationsEnabled } = useSettingsStore();
-  const { profile } = useProfileStore();
+  const { settings, updateSettings, setNotificationsEnabled, setCrisisRegion } = useSettingsStore();
+  const { profile, updateProfile } = useProfileStore();
   const { lock, hasPin: checkHasPin } = useAuthStore();
   
   const [hasPin, setHasPin] = useState(false);
@@ -109,24 +120,22 @@ export default function SettingsScreen() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  
+  // Profile editing state
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [showProgramModal, setShowProgramModal] = useState(false);
+  const [editingName, setEditingName] = useState('');
+  const [editingDate, setEditingDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     checkHasPin().then(setHasPin);
   }, []);
 
   const getProgramLabel = () => {
-    switch (profile?.programType) {
-      case '12-step-aa':
-        return 'Alcoholics Anonymous';
-      case '12-step-na':
-        return 'Narcotics Anonymous';
-      case 'smart':
-        return 'SMART Recovery';
-      case 'custom':
-        return 'Custom Program';
-      default:
-        return 'Not set';
-    }
+    const option = PROGRAM_OPTIONS.find(o => o.value === profile?.programType);
+    return option?.label || 'Not set';
   };
 
   const handleToggleBiometric = async (enabled: boolean) => {
@@ -246,6 +255,18 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const handleChangeCrisisRegion = () => {
+    const regions = getAvailableRegions();
+    Alert.alert(
+      'Crisis Resources Region',
+      'Select your region for local emergency hotlines',
+      regions.map(({ code, name }) => ({
+        text: name,
+        onPress: () => setCrisisRegion(code as CrisisRegion),
+      }))
+    );
+  };
+
   const getAutoLockLabel = () => {
     if (!settings) return '';
     if (settings.autoLockMinutes === 0) return 'Immediately';
@@ -256,6 +277,58 @@ export default function SettingsScreen() {
   const getThemeLabel = () => {
     if (!settings) return 'System';
     return settings.themeMode.charAt(0).toUpperCase() + settings.themeMode.slice(1);
+  };
+
+  const getCrisisRegionLabel = () => {
+    if (!settings) return 'United States';
+    const regions = getAvailableRegions();
+    return regions.find(r => r.code === settings.crisisRegion)?.name || 'United States';
+  };
+
+  // Profile editing handlers
+  const handleEditName = () => {
+    setEditingName(profile?.displayName || '');
+    setShowNameModal(true);
+  };
+
+  const handleSaveName = async () => {
+    await updateProfile({ displayName: editingName || undefined });
+    setShowNameModal(false);
+  };
+
+  const handleEditDate = () => {
+    setEditingDate(profile?.sobrietyDate ? new Date(profile.sobrietyDate) : new Date());
+    setShowDateModal(true);
+    if (Platform.OS === 'android') {
+      setShowDatePicker(true);
+    }
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      if (event.type === 'dismissed') {
+        setShowDateModal(false);
+        return;
+      }
+    }
+    if (selectedDate) {
+      setEditingDate(selectedDate);
+    }
+  };
+
+  const handleSaveDate = async () => {
+    await updateProfile({ sobrietyDate: editingDate });
+    setShowDateModal(false);
+  };
+
+  const handleEditProgram = () => {
+    setShowProgramModal(true);
+  };
+
+  const handleSelectProgram = async (program: ProgramType) => {
+    await updateProfile({ programType: program });
+    setShowProgramModal(false);
   };
 
   return (
@@ -292,7 +365,7 @@ export default function SettingsScreen() {
               icon="👤"
               title="Display Name"
               value={profile?.displayName || 'Not set'}
-              onPress={() => Alert.alert('Coming Soon', 'Edit name in a future update')}
+              onPress={handleEditName}
               accessibilityLabel={`Display name: ${profile?.displayName || 'Not set'}`}
               accessibilityHint="Double tap to edit your display name"
             />
@@ -302,7 +375,7 @@ export default function SettingsScreen() {
               value={profile?.sobrietyDate
                 ? new Date(profile.sobrietyDate).toLocaleDateString()
                 : 'Not set'}
-              onPress={() => Alert.alert('Coming Soon', 'Edit date in a future update')}
+              onPress={handleEditDate}
               accessibilityLabel={`Sobriety date: ${profile?.sobrietyDate ? new Date(profile.sobrietyDate).toLocaleDateString() : 'Not set'}`}
               accessibilityHint="Double tap to edit your sobriety date"
             />
@@ -310,7 +383,7 @@ export default function SettingsScreen() {
               icon="🎯"
               title="Program"
               value={getProgramLabel()}
-              onPress={() => Alert.alert('Coming Soon', 'Change program in a future update')}
+              onPress={handleEditProgram}
               accessibilityLabel={`Recovery program: ${getProgramLabel()}`}
               accessibilityHint="Double tap to change your recovery program"
             />
@@ -405,6 +478,27 @@ export default function SettingsScreen() {
           </Card>
         </View>
 
+        {/* Crisis Resources Section */}
+        <View className="mb-6">
+          <Text 
+            className="text-sm font-semibold text-surface-500 uppercase mb-2"
+            accessibilityRole="header"
+          >
+            Crisis Resources
+          </Text>
+          <Card variant="default">
+            <SettingRow
+              icon="📍"
+              title="Region"
+              subtitle="Local emergency hotlines"
+              value={getCrisisRegionLabel()}
+              onPress={handleChangeCrisisRegion}
+              accessibilityLabel={`Crisis resources region: ${getCrisisRegionLabel()}`}
+              accessibilityHint="Double tap to change your region for crisis resources"
+            />
+          </Card>
+        </View>
+
         {/* Data Section */}
         <View className="mb-6">
           <Text 
@@ -471,6 +565,191 @@ export default function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Edit Name Modal */}
+      <Modal
+        visible={showNameModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowNameModal(false)}
+        accessibilityViewIsModal
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white dark:bg-surface-800 rounded-2xl p-6 w-full max-w-sm">
+            <Text 
+              className="text-xl font-bold text-surface-900 dark:text-surface-100 text-center mb-4"
+              accessibilityRole="header"
+            >
+              Edit Display Name
+            </Text>
+            
+            <TextInput
+              className="border-2 border-surface-200 dark:border-surface-600 rounded-xl px-4 py-3 text-lg text-surface-900 dark:text-surface-100 mb-4"
+              value={editingName}
+              onChangeText={setEditingName}
+              placeholder="Enter your name"
+              placeholderTextColor="#9ca3af"
+              autoFocus
+              accessibilityLabel="Display name input"
+            />
+            
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setShowNameModal(false)}
+                className="flex-1 py-3 rounded-xl bg-surface-100 dark:bg-surface-700"
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+              >
+                <Text className="text-center font-semibold text-surface-700 dark:text-surface-300">
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={handleSaveName}
+                className="flex-1 py-3 rounded-xl bg-primary-600"
+                accessibilityRole="button"
+                accessibilityLabel="Save name"
+              >
+                <Text className="text-center font-semibold text-white">
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Date Modal */}
+      <Modal
+        visible={showDateModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowDateModal(false)}
+        accessibilityViewIsModal
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white dark:bg-surface-800 rounded-2xl p-6 w-full max-w-sm">
+            <Text 
+              className="text-xl font-bold text-surface-900 dark:text-surface-100 text-center mb-4"
+              accessibilityRole="header"
+            >
+              Edit Sobriety Date
+            </Text>
+            
+            <Text className="text-surface-500 text-center mb-4">
+              This is the date you started your recovery journey.
+            </Text>
+
+            {Platform.OS === 'ios' ? (
+              <DateTimePicker
+                value={editingDate}
+                mode="date"
+                display="spinner"
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+                style={{ height: 150 }}
+              />
+            ) : showDatePicker ? (
+              <DateTimePicker
+                value={editingDate}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+              />
+            ) : (
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(true)}
+                className="border-2 border-surface-200 dark:border-surface-600 rounded-xl px-4 py-3 mb-4"
+              >
+                <Text className="text-lg text-center text-surface-900 dark:text-surface-100">
+                  {editingDate.toLocaleDateString()}
+                </Text>
+              </TouchableOpacity>
+            )}
+            
+            <View className="flex-row gap-3 mt-4">
+              <TouchableOpacity
+                onPress={() => setShowDateModal(false)}
+                className="flex-1 py-3 rounded-xl bg-surface-100 dark:bg-surface-700"
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+              >
+                <Text className="text-center font-semibold text-surface-700 dark:text-surface-300">
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={handleSaveDate}
+                className="flex-1 py-3 rounded-xl bg-primary-600"
+                accessibilityRole="button"
+                accessibilityLabel="Save date"
+              >
+                <Text className="text-center font-semibold text-white">
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Program Modal */}
+      <Modal
+        visible={showProgramModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowProgramModal(false)}
+        accessibilityViewIsModal
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white dark:bg-surface-800 rounded-2xl p-6 w-full max-w-sm">
+            <Text 
+              className="text-xl font-bold text-surface-900 dark:text-surface-100 text-center mb-4"
+              accessibilityRole="header"
+            >
+              Select Program
+            </Text>
+            
+            <View className="gap-2">
+              {PROGRAM_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  onPress={() => handleSelectProgram(option.value)}
+                  className={`py-4 px-4 rounded-xl ${
+                    profile?.programType === option.value
+                      ? 'bg-primary-100 dark:bg-primary-900/30 border-2 border-primary-500'
+                      : 'bg-surface-100 dark:bg-surface-700'
+                  }`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: profile?.programType === option.value }}
+                >
+                  <Text className={`text-center font-medium ${
+                    profile?.programType === option.value
+                      ? 'text-primary-700 dark:text-primary-300'
+                      : 'text-surface-700 dark:text-surface-300'
+                  }`}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <TouchableOpacity
+              onPress={() => setShowProgramModal(false)}
+              className="mt-4 py-3 rounded-xl bg-surface-100 dark:bg-surface-700"
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+            >
+              <Text className="text-center font-semibold text-surface-700 dark:text-surface-300">
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <Modal

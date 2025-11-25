@@ -14,114 +14,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Card, Button } from '../components/ui';
-
-interface HotlineResource {
-  id: string;
-  name: string;
-  phone: string;
-  description: string;
-  available: string;
-  color: string;
-}
-
-const HOTLINES: HotlineResource[] = [
-  {
-    id: 'emergency',
-    name: 'Emergency Services',
-    phone: '000',
-    description: 'Life-threatening emergency - Police, Fire, Ambulance',
-    available: '24/7',
-    color: '#ef4444',
-  },
-  {
-    id: 'lifeline',
-    name: 'Lifeline Australia',
-    phone: '13 11 14',
-    description: 'Free, confidential 24/7 crisis support and suicide prevention',
-    available: '24/7',
-    color: '#3b82f6',
-  },
-  {
-    id: 'suicide-callback',
-    name: 'Suicide Call Back Service',
-    phone: '1300 659 467',
-    description: 'Free professional 24/7 telephone and online counselling',
-    available: '24/7',
-    color: '#dc2626',
-  },
-  {
-    id: 'beyond-blue',
-    name: 'Beyond Blue',
-    phone: '1300 22 4636',
-    description: 'Mental health support and information',
-    available: '24/7',
-    color: '#22c55e',
-  },
-  {
-    id: 'directline',
-    name: 'DirectLine',
-    phone: '1800 888 236',
-    description: 'Alcohol and drug counselling and support (Victoria)',
-    available: '24/7',
-    color: '#6366f1',
-  },
-  {
-    id: 'aa',
-    name: 'Alcoholics Anonymous',
-    phone: '1300 222 222',
-    description: 'AA Australia - Find meetings and support',
-    available: '24/7',
-    color: '#8b5cf6',
-  },
-  {
-    id: 'na',
-    name: 'Narcotics Anonymous',
-    phone: '1800 652 820',
-    description: 'NA Australia - Find meetings and support',
-    available: '24/7',
-    color: '#a855f7',
-  },
-];
-
-const COPING_STRATEGIES = [
-  {
-    title: 'Call Your Sponsor',
-    description: 'Reach out to your sponsor or a trusted person in recovery',
-    icon: '📞',
-  },
-  {
-    title: 'Attend a Meeting',
-    description: 'Find an in-person or online meeting right now',
-    icon: '👥',
-  },
-  {
-    title: 'HALT Check',
-    description: 'Are you Hungry, Angry, Lonely, or Tired?',
-    icon: '🛑',
-  },
-  {
-    title: 'Play the Tape Forward',
-    description: 'Think through where using would lead',
-    icon: '⏩',
-  },
-  {
-    title: 'Change Your Environment',
-    description: 'Leave the situation. Go somewhere safe.',
-    icon: '🚶',
-  },
-  {
-    title: 'Breathe',
-    description: 'Try the breathing exercises in this app',
-    icon: '🧘',
-  },
-];
+import { Card } from '../components/ui';
+import { useSettingsStore } from '../lib/store';
+import {
+  getCrisisResources,
+  getAvailableRegions,
+  COPING_STRATEGIES,
+  type CrisisHotline,
+  type CrisisRegion,
+} from '../lib/constants/crisisResources';
 
 function HotlineCard({
   hotline,
   onCall,
 }: {
-  hotline: HotlineResource;
+  hotline: CrisisHotline;
   onCall: () => void;
 }) {
   return (
@@ -156,21 +63,26 @@ function HotlineCard({
 
 export default function EmergencyScreen() {
   const router = useRouter();
+  const { settings, setCrisisRegion } = useSettingsStore();
+  
+  const currentRegion = settings?.crisisRegion || 'US';
+  const resources = getCrisisResources(currentRegion);
+  const availableRegions = getAvailableRegions();
 
-  const handleCall = (hotline: HotlineResource) => {
+  const handleCall = (hotline: CrisisHotline) => {
     const phoneNumber = hotline.phone.replace(/\D/g, '');
     
-    // Special handling for emergency 000
-    if (hotline.id === 'emergency') {
+    // Special handling for emergency numbers
+    if (hotline.isEmergency) {
       Alert.alert(
-        'Call Emergency Services (000)?',
-        'This will connect you to Police, Fire, or Ambulance for life-threatening emergencies only.',
+        `Call ${hotline.name} (${hotline.phone})?`,
+        'This will connect you to emergency services for life-threatening emergencies only.',
         [
           { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Call 000',
+            text: `Call ${hotline.phone}`,
             style: 'destructive',
-            onPress: () => Linking.openURL('tel:000'),
+            onPress: () => Linking.openURL(`tel:${phoneNumber}`),
           },
         ]
       );
@@ -190,13 +102,33 @@ export default function EmergencyScreen() {
     );
   };
 
+  const handleChangeRegion = () => {
+    Alert.alert(
+      'Select Your Region',
+      'Choose your region for local crisis resources',
+      availableRegions.map(({ code, name }) => ({
+        text: name,
+        onPress: () => setCrisisRegion(code as CrisisRegion),
+        style: code === currentRegion ? 'default' : undefined,
+      }))
+    );
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-surface-50 dark:bg-surface-900">
       <ScrollView className="flex-1 px-4 py-6">
         {/* Header */}
-        <View className="flex-row items-center mb-6">
+        <View className="flex-row items-center justify-between mb-6">
           <TouchableOpacity onPress={() => router.back()} className="mr-4">
             <Text className="text-primary-600 text-base">← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={handleChangeRegion}
+            className="bg-surface-100 dark:bg-surface-800 px-3 py-1 rounded-full"
+          >
+            <Text className="text-surface-600 dark:text-surface-300 text-sm">
+              📍 {resources.name}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -219,9 +151,9 @@ export default function EmergencyScreen() {
         {/* Crisis Hotlines */}
         <View className="mb-6">
           <Text className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">
-            Crisis Hotlines
+            Crisis Hotlines ({resources.name})
           </Text>
-          {HOTLINES.map((hotline) => (
+          {resources.hotlines.map((hotline) => (
             <HotlineCard
               key={hotline.id}
               hotline={hotline}
@@ -302,4 +234,3 @@ export default function EmergencyScreen() {
     </SafeAreaView>
   );
 }
-

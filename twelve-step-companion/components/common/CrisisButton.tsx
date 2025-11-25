@@ -15,34 +15,8 @@ import {
   useColorScheme 
 } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
-
-// Emergency resources for quick modal (Australia/Melbourne)
-const quickResources = [
-  {
-    id: 'lifeline',
-    title: 'Lifeline',
-    subtitle: '13 11 14 - 24/7 Crisis Support',
-    action: () => Linking.openURL('tel:131114'),
-    emoji: '📞',
-    color: 'bg-red-600',
-  },
-  {
-    id: 'suicide-callback',
-    title: 'Suicide Call Back Service',
-    subtitle: '1300 659 467 - 24/7 Support',
-    action: () => Linking.openURL('tel:1300659467'),
-    emoji: '💬',
-    color: 'bg-orange-600',
-  },
-  {
-    id: 'emergency',
-    title: 'Emergency Services',
-    subtitle: '000 - Life-threatening emergency',
-    action: () => Linking.openURL('tel:000'),
-    emoji: '🆘',
-    color: 'bg-blue-600',
-  },
-];
+import { useSettingsStore } from '../../lib/store';
+import { getCrisisResources, type CrisisResource } from '../../lib/constants/crisisResources';
 
 export function CrisisButton() {
   const [showQuickHelp, setShowQuickHelp] = useState(false);
@@ -50,6 +24,12 @@ export function CrisisButton() {
   const segments = useSegments();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { settings } = useSettingsStore();
+
+  // Get region-specific quick resources
+  const currentRegion = settings?.crisisRegion || 'US';
+  const resources = getCrisisResources(currentRegion);
+  const quickResources = resources.quickResources;
 
   // Hide on certain screens
   const currentPath = segments.join('/');
@@ -71,6 +51,11 @@ export function CrisisButton() {
   const handleGoToResources = () => {
     setShowQuickHelp(false);
     router.push('/emergency');
+  };
+
+  const handleCallResource = (resource: CrisisResource) => {
+    setShowQuickHelp(false);
+    Linking.openURL(`tel:${resource.phone}`);
   };
 
   return (
@@ -133,6 +118,9 @@ export function CrisisButton() {
               <Text className="text-surface-500 text-center mt-1">
                 You're not alone. Reach out immediately.
               </Text>
+              <Text className="text-surface-400 text-center text-xs mt-1">
+                📍 {resources.name}
+              </Text>
             </View>
 
             {/* Quick Actions */}
@@ -140,10 +128,7 @@ export function CrisisButton() {
               {quickResources.map((resource) => (
                 <TouchableOpacity
                   key={resource.id}
-                  onPress={() => {
-                    setShowQuickHelp(false);
-                    resource.action();
-                  }}
+                  onPress={() => handleCallResource(resource)}
                   className={`${resource.color} rounded-xl p-4 flex-row items-center gap-4`}
                   accessibilityRole="button"
                   accessibilityLabel={`${resource.title}: ${resource.subtitle}`}
@@ -200,4 +185,3 @@ export function CrisisButton() {
 }
 
 export default CrisisButton;
-

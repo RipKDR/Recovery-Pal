@@ -1,6 +1,6 @@
 /**
  * Dashboard/Home Screen
- * Main recovery overview with sobriety counter and quick actions
+ * Main recovery overview with daily reading, sobriety counter, and quick actions
  */
 
 import React from 'react';
@@ -10,8 +10,11 @@ import { useRouter } from 'expo-router';
 import { SobrietyCounter, MilestoneCard } from '../../components/progress';
 import { Card, Button } from '../../components/ui';
 import { ReflectionCard } from '../../components/journal';
+import { DailyReadingCard, PhoneWidget, StatsRow, UpcomingMeetingWidget } from '../../components/home';
+import { SponsorWidget } from '../../components/common';
 import { useSobriety } from '../../lib/hooks/useSobriety';
 import { useCheckin } from '../../lib/hooks/useCheckin';
+import { useMeetings } from '../../lib/hooks/useMeetings';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -33,12 +36,23 @@ export default function DashboardScreen() {
     averageMood,
   } = useCheckin();
 
+  const { insights } = useMeetings();
+
   // Get greeting based on time of day
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
+  };
+
+  // Get formatted date
+  const getFormattedDate = () => {
+    return new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    });
   };
 
   // If no profile, show onboarding prompt
@@ -71,45 +85,54 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface-50 dark:bg-surface-900">
       <ScrollView className="flex-1 px-4 py-6">
-        {/* Header */}
+        {/* Header with greeting and day count */}
         <View className="flex-row justify-between items-start mb-6">
-          <View accessible accessibilityRole="header">
-            <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100">
-              {getGreeting()}, {profile?.displayName || 'Friend'} 👋
-            </Text>
+          <View accessible accessibilityRole="header" className="flex-1">
+            <View className="flex-row items-baseline">
+              <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+                {getGreeting()}{profile?.displayName ? `, ${profile.displayName}` : ''}
+              </Text>
+            </View>
             <Text className="text-surface-500 mt-1">
-              {new Date().toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-              })}
+              {getFormattedDate()}
             </Text>
           </View>
-          <TouchableOpacity
-            onPress={() => router.push('/settings')}
-            className="w-10 h-10 bg-surface-100 dark:bg-surface-800 rounded-full items-center justify-center"
-            accessibilityRole="button"
-            accessibilityLabel="Open settings"
-            accessibilityHint="Navigate to app settings"
-          >
-            <Text className="text-lg" accessibilityElementsHidden>⚙️</Text>
-          </TouchableOpacity>
+          <View className="flex-row items-center gap-2">
+            {/* Day counter badge */}
+            <View className="bg-primary-100 dark:bg-primary-900/40 px-3 py-1.5 rounded-full">
+              <Text className="text-primary-700 dark:text-primary-300 font-bold">
+                Day {soberDays}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => router.push('/settings')}
+              className="w-10 h-10 bg-surface-100 dark:bg-surface-800 rounded-full items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="Open settings"
+              accessibilityHint="Navigate to app settings"
+            >
+              <Text className="text-lg" accessibilityElementsHidden>⚙️</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Sobriety Counter */}
+        {/* Daily Reading Card */}
+        <DailyReadingCard className="mb-4" />
+
+        {/* Sobriety Counter - Simplified */}
         <SobrietyCounter
           days={soberDays}
           hours={soberHours}
           minutes={soberMinutes}
           showDetailed={soberDays >= 30}
-          className="mb-6"
+          className="mb-4"
         />
 
         {/* Quick Check-in Card */}
         {!hasCheckedInToday ? (
           <Card 
             variant="outlined" 
-            className="mb-6 border-primary-200 dark:border-primary-800"
+            className="mb-4 border-primary-200 dark:border-primary-800"
             accessibilityLabel={`Daily check-in available. How are you feeling today?`}
           >
             <View className="flex-row items-center gap-3 mb-3">
@@ -135,7 +158,7 @@ export default function DashboardScreen() {
           <>
             <Card 
               variant="default" 
-              className="mb-3 bg-secondary-50 dark:bg-secondary-900/30"
+              className="mb-4 bg-secondary-50 dark:bg-secondary-900/30"
               accessibilityLabel={`Already checked in today. Mood: ${todayCheckin?.mood} out of 10. Craving level: ${todayCheckin?.cravingLevel} out of 10.`}
             >
               <View className="flex-row items-center gap-3">
@@ -159,7 +182,7 @@ export default function DashboardScreen() {
                 accessibilityLabel="Open Motivation Vault"
                 accessibilityHint="Access your personal motivation content when cravings are strong"
               >
-                <Card variant="outlined" className="mb-6 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
+                <Card variant="outlined" className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
                   <View className="flex-row items-center gap-3">
                     <Text className="text-2xl" accessibilityElementsHidden>🔐</Text>
                     <View className="flex-1">
@@ -177,9 +200,26 @@ export default function DashboardScreen() {
           </>
         )}
 
+        {/* Sponsor Widget */}
+        <SponsorWidget className="mb-4" />
+
+        {/* Upcoming Meeting Widget */}
+        <UpcomingMeetingWidget className="mb-4" />
+
+        {/* Stats Row */}
+        <StatsRow
+          meetingCount={insights.totalMeetings}
+          checkinStreak={checkinStreak}
+          averageMood={averageMood}
+          className="mb-4"
+        />
+
+        {/* Phone Calls Widget */}
+        <PhoneWidget className="mb-4" />
+
         {/* Next Milestone */}
         {nextMilestone && (
-          <View className="mb-6" accessible accessibilityRole="text">
+          <View className="mb-4" accessible accessibilityRole="text">
             <Text 
               className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3"
               accessibilityRole="header"
@@ -195,28 +235,8 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Quick Stats */}
-        <View 
-          className="flex-row gap-3 mb-6"
-          accessible
-          accessibilityLabel={`Quick stats. ${checkinStreak} day check-in streak. Average mood ${averageMood.toFixed(1)} out of 10.`}
-        >
-          <Card variant="default" className="flex-1" accessibilityElementsHidden>
-            <Text className="text-2xl font-bold text-primary-600">
-              {checkinStreak}
-            </Text>
-            <Text className="text-sm text-surface-500">Day Streak</Text>
-          </Card>
-          <Card variant="default" className="flex-1" accessibilityElementsHidden>
-            <Text className="text-2xl font-bold text-secondary-600">
-              {averageMood.toFixed(1)}
-            </Text>
-            <Text className="text-sm text-surface-500">Avg Mood</Text>
-          </Card>
-        </View>
-
         {/* Reflection Card - Look Back */}
-        <ReflectionCard daysAgo={30} className="mb-6" />
+        <ReflectionCard daysAgo={30} className="mb-4" />
 
         {/* Quick Actions */}
         <View className="mb-6">
@@ -237,6 +257,30 @@ export default function DashboardScreen() {
               <Text className="text-lg" accessibilityElementsHidden>📝</Text>
               <Text className="text-primary-700 dark:text-primary-300 font-medium">
                 New Journal
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/my-meetings')}
+              className="bg-blue-100 dark:bg-blue-900/30 rounded-xl px-4 py-3 flex-row items-center gap-2"
+              accessibilityRole="button"
+              accessibilityLabel="My Meetings"
+              accessibilityHint="View and manage your regular meetings"
+            >
+              <Text className="text-lg" accessibilityElementsHidden>📅</Text>
+              <Text className="text-blue-700 dark:text-blue-300 font-medium">
+                My Meetings
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/contacts')}
+              className="bg-green-100 dark:bg-green-900/30 rounded-xl px-4 py-3 flex-row items-center gap-2"
+              accessibilityRole="button"
+              accessibilityLabel="Recovery Contacts"
+              accessibilityHint="View and manage your recovery contacts"
+            >
+              <Text className="text-lg" accessibilityElementsHidden>📱</Text>
+              <Text className="text-green-700 dark:text-green-300 font-medium">
+                Contacts
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -261,18 +305,6 @@ export default function DashboardScreen() {
               <Text className="text-lg" accessibilityElementsHidden>📊</Text>
               <Text className="text-amber-700 dark:text-amber-300 font-medium">
                 Weekly Report
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push('/scenarios')}
-              className="bg-rose-100 dark:bg-rose-900/30 rounded-xl px-4 py-3 flex-row items-center gap-2"
-              accessibilityRole="button"
-              accessibilityLabel="Practice Scenarios"
-              accessibilityHint="Practice coping with common trigger situations"
-            >
-              <Text className="text-lg" accessibilityElementsHidden>🎯</Text>
-              <Text className="text-rose-700 dark:text-rose-300 font-medium">
-                Practice Scenarios
               </Text>
             </TouchableOpacity>
           </View>

@@ -37,6 +37,7 @@ import type {
   ProgramType,
   ThemeMode,
   VaultItemType,
+  CrisisRegion,
 } from '../types';
 
 /**
@@ -277,6 +278,7 @@ export async function exportAllData(): Promise<string> {
     biometricEnabled: settingsRow.biometric_enabled === 1,
     themeMode: settingsRow.theme_mode as ThemeMode,
     notificationsEnabled: settingsRow.notifications_enabled === 1,
+    crisisRegion: (settingsRow.crisis_region as CrisisRegion) || 'global',
     createdAt: new Date(settingsRow.created_at),
     updatedAt: new Date(settingsRow.updated_at),
   } : null;

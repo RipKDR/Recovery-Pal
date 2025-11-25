@@ -21,6 +21,9 @@ export type MeetingType = 'in-person' | 'online';
 // Theme modes
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+// Crisis resource regions
+export type CrisisRegion = 'AU' | 'US' | 'UK' | 'CA' | 'NZ' | 'IE';
+
 /**
  * Core user profile for recovery tracking
  */
@@ -66,6 +69,9 @@ export interface Milestone {
   createdAt: Date;
 }
 
+// Connection modes for meetings
+export type MeetingConnectionMode = 'got_number' | 'conversation' | 'made_plans' | 'sponsor_chat';
+
 /**
  * Meeting attendance log
  */
@@ -80,6 +86,14 @@ export interface MeetingLog {
   topicTags: string[];
   attendedAt: Date;
   createdAt: Date;
+  // Enhanced fields (Phase 2)
+  whatILearned?: EncryptedString;
+  quoteHeard?: EncryptedString;
+  connectionsMode?: MeetingConnectionMode[];
+  connectionNotes?: EncryptedString;
+  didShare: boolean;
+  shareReflection?: EncryptedString;
+  regularMeetingId?: string; // Link to regular meeting
 }
 
 /**
@@ -116,6 +130,7 @@ export interface AppSettings {
   biometricEnabled: boolean;
   themeMode: ThemeMode;
   notificationsEnabled: boolean;
+  crisisRegion: CrisisRegion; // Region for crisis hotlines
   createdAt: Date;
   updatedAt: Date;
 }
@@ -224,6 +239,14 @@ export interface DbMeetingLog {
   topic_tags: string;
   attended_at: string;
   created_at: string;
+  // Enhanced fields (Phase 2)
+  what_i_learned: string | null;
+  quote_heard: string | null;
+  connections_mode: string | null; // JSON array
+  connection_notes: string | null;
+  did_share: number;
+  share_reflection: string | null;
+  regular_meeting_id: string | null;
 }
 
 export interface DbEmotionTag {
@@ -241,6 +264,7 @@ export interface DbAppSettings {
   biometric_enabled: number;
   theme_mode: string;
   notifications_enabled: number;
+  crisis_region: string;
   created_at: string;
   updated_at: string;
 }
@@ -317,5 +341,358 @@ export interface DbScenarioPractice {
   selected_option_index: number;
   reflection: string | null;
   completed_at: string;
+}
+
+// ============================================
+// V2 Types - Recovery Companion Enhancement
+// ============================================
+
+// Recovery contact roles
+export type ContactRole = 'sponsor' | 'sponsee' | 'home_group' | 'fellowship' | 'emergency';
+
+/**
+ * Recovery contacts for fellowship network
+ */
+export interface RecoveryContact {
+  id: string;
+  name: string;
+  phone: string;
+  role: ContactRole;
+  notes?: EncryptedString;
+  lastContactedAt?: Date;
+  createdAt: Date;
+}
+
+export interface DbRecoveryContact {
+  id: string;
+  name: string;
+  phone: string;
+  role: string;
+  notes: string | null;
+  last_contacted_at: string | null;
+  created_at: string;
+}
+
+// Regular meeting types
+export type RegularMeetingType = 'in-person' | 'online' | 'hybrid';
+
+/**
+ * Regular meetings (recurring schedule)
+ */
+export interface RegularMeeting {
+  id: string;
+  name: string;
+  location?: string;
+  dayOfWeek: number; // 0-6 (Sunday-Saturday)
+  time: string; // HH:mm format
+  type: RegularMeetingType;
+  isHomeGroup: boolean;
+  reminderEnabled: boolean;
+  reminderMinutesBefore: number;
+  notes?: EncryptedString;
+  createdAt: Date;
+}
+
+export interface DbRegularMeeting {
+  id: string;
+  name: string;
+  location: string | null;
+  day_of_week: number;
+  time: string;
+  type: string;
+  is_home_group: number;
+  reminder_enabled: number;
+  reminder_minutes_before: number;
+  notes: string | null;
+  created_at: string;
+}
+
+// Achievement system types
+export type AchievementCategory = 
+  | 'keytags' 
+  | 'step_work' 
+  | 'fellowship' 
+  | 'service' 
+  | 'daily_practice';
+
+export type AchievementStatus = 
+  | 'locked' 
+  | 'available' 
+  | 'in_progress' 
+  | 'unlocked';
+
+export type AchievementUnlockType = 
+  | 'self_check' 
+  | 'automatic' 
+  | 'progressive' 
+  | 'count' 
+  | 'streak';
+
+/**
+ * Achievement definitions and progress
+ */
+export interface Achievement {
+  id: string;
+  category: AchievementCategory;
+  title: string;
+  description: string;
+  icon: string;
+  unlockType: AchievementUnlockType;
+  target?: number;
+  current?: number;
+  status: AchievementStatus;
+  unlockedAt?: Date;
+  requiresDaysClean?: number;
+  requiresAchievements?: string[];
+  reflection?: EncryptedString;
+}
+
+export interface DbAchievement {
+  id: string;
+  category: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlock_type: string;
+  target: number | null;
+  current: number | null;
+  status: string;
+  unlocked_at: string | null;
+  requires_days_clean: number | null;
+  requires_achievements: string | null;
+  reflection: string | null;
+}
+
+/**
+ * Daily reading entry
+ */
+export interface DailyReading {
+  id: string;
+  date: string; // MM-DD format
+  title: string;
+  content: string;
+  reflectionPrompt: string;
+  source: 'jft' | 'daily_reflections' | 'custom';
+}
+
+/**
+ * Daily reading reflection (user's response)
+ */
+export interface DailyReadingReflection {
+  id: string;
+  readingDate: string; // MM-DD format
+  reflection: EncryptedString;
+  createdAt: Date;
+}
+
+export interface DbDailyReadingReflection {
+  id: string;
+  reading_date: string;
+  reflection: string;
+  created_at: string;
+}
+
+// Fourth step inventory types
+export type FourthStepType = 'resentment' | 'fear' | 'sex_conduct';
+
+/**
+ * Fourth Step inventory entry
+ */
+export interface FourthStepEntry {
+  id: string;
+  type: FourthStepType;
+  who: EncryptedString;
+  cause: EncryptedString;
+  affects: string[]; // Self-esteem, Security, Ambitions, Personal Relations, Sex Relations
+  myPart: EncryptedString;
+  createdAt: Date;
+}
+
+export interface DbFourthStepEntry {
+  id: string;
+  type: string;
+  who: string;
+  cause: string;
+  affects: string; // JSON array
+  my_part: string;
+  created_at: string;
+}
+
+// Amends types
+export type AmendsType = 'direct' | 'indirect' | 'living';
+export type AmendsStatus = 'not_willing' | 'willing' | 'planned' | 'in_progress' | 'made';
+
+/**
+ * Eighth/Ninth Step amends entry
+ */
+export interface AmendsEntry {
+  id: string;
+  person: EncryptedString;
+  harm: EncryptedString;
+  amendsType: AmendsType;
+  status: AmendsStatus;
+  notes?: EncryptedString;
+  madeAt?: Date;
+  createdAt: Date;
+}
+
+export interface DbAmendsEntry {
+  id: string;
+  person: string;
+  harm: string;
+  amends_type: string;
+  status: string;
+  notes: string | null;
+  made_at: string | null;
+  created_at: string;
+}
+
+/**
+ * Phone call log for fellowship connection tracking
+ */
+export interface PhoneCallLog {
+  id: string;
+  contactId: string;
+  contactName: string;
+  duration?: number; // minutes
+  notes?: EncryptedString;
+  calledAt: Date;
+}
+
+export interface DbPhoneCallLog {
+  id: string;
+  contact_id: string;
+  contact_name: string;
+  duration: number | null;
+  notes: string | null;
+  called_at: string;
+}
+
+/**
+ * Gratitude list entry
+ */
+export interface GratitudeEntry {
+  id: string;
+  date: Date;
+  items: EncryptedString; // JSON array of gratitude items
+  createdAt: Date;
+}
+
+export interface DbGratitudeEntry {
+  id: string;
+  date: string;
+  items: string;
+  created_at: string;
+}
+
+/**
+ * Tenth Step nightly review
+ */
+export interface TenthStepReview {
+  id: string;
+  date: Date;
+  wasResentful?: EncryptedString;
+  wasSelfish?: EncryptedString;
+  wasDishonest?: EncryptedString;
+  wasAfraid?: EncryptedString;
+  oweApology?: EncryptedString;
+  couldDoBetter?: EncryptedString;
+  gratefulFor?: EncryptedString;
+  createdAt: Date;
+}
+
+export interface DbTenthStepReview {
+  id: string;
+  date: string;
+  was_resentful: string | null;
+  was_selfish: string | null;
+  was_dishonest: string | null;
+  was_afraid: string | null;
+  owe_apology: string | null;
+  could_do_better: string | null;
+  grateful_for: string | null;
+  created_at: string;
+}
+
+/**
+ * Literature reading progress
+ */
+export interface LiteratureProgress {
+  id: string;
+  bookId: string;
+  chapterId: string;
+  isCompleted: boolean;
+  notes?: EncryptedString;
+  completedAt?: Date;
+  createdAt: Date;
+}
+
+export interface DbLiteratureProgress {
+  id: string;
+  book_id: string;
+  chapter_id: string;
+  is_completed: number;
+  notes: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+// Step progress types
+export type StepStatus = 
+  | 'locked' 
+  | 'available' 
+  | 'started' 
+  | 'in_progress' 
+  | 'completed' 
+  | 'discussed';
+
+/**
+ * Step work progress tracking
+ */
+export interface StepProgress {
+  id: string;
+  stepNumber: number;
+  questionsAnswered: number;
+  totalQuestions: number;
+  status: StepStatus;
+  startedAt?: Date;
+  completedAt?: Date;
+  discussedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DbStepProgress {
+  id: string;
+  step_number: number;
+  questions_answered: number;
+  total_questions: number;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  discussed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Step work answer
+ */
+export interface StepAnswer {
+  id: string;
+  stepNumber: number;
+  questionIndex: number;
+  answer: EncryptedString;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DbStepAnswer {
+  id: string;
+  step_number: number;
+  question_index: number;
+  answer: string;
+  created_at: string;
+  updated_at: string;
 }
 

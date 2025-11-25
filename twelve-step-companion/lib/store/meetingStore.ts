@@ -12,7 +12,7 @@ import {
   cancelMeetingReminder,
   sendMeetingEncouragement,
 } from '../notifications';
-import type { MeetingLog, DbMeetingLog, MeetingType } from '../types';
+import type { MeetingLog, DbMeetingLog, MeetingType, MeetingConnectionMode } from '../types';
 
 interface MeetingInsights {
   totalMeetings: number;
@@ -22,6 +22,7 @@ interface MeetingInsights {
   mostCommonTopic: string | null;
   lastMeetingDate: Date | null;
   daysSinceLastMeeting: number | null;
+  shareRate: number; // Percentage of meetings where user shared
 }
 
 interface MeetingState {
@@ -30,28 +31,48 @@ interface MeetingState {
   insights: MeetingInsights;
 }
 
+interface CreateMeetingData {
+  name?: string;
+  location?: string;
+  type: MeetingType;
+  moodBefore: number;
+  moodAfter: number;
+  keyTakeaways: string;
+  topicTags: string[];
+  attendedAt?: Date;
+  // Enhanced fields
+  whatILearned?: string;
+  quoteHeard?: string;
+  connectionsMode?: MeetingConnectionMode[];
+  connectionNotes?: string;
+  didShare?: boolean;
+  shareReflection?: string;
+  regularMeetingId?: string;
+}
+
+interface UpdateMeetingData {
+  name?: string;
+  location?: string;
+  type?: MeetingType;
+  moodBefore?: number;
+  moodAfter?: number;
+  keyTakeaways?: string;
+  topicTags?: string[];
+  attendedAt?: Date;
+  // Enhanced fields
+  whatILearned?: string;
+  quoteHeard?: string;
+  connectionsMode?: MeetingConnectionMode[];
+  connectionNotes?: string;
+  didShare?: boolean;
+  shareReflection?: string;
+  regularMeetingId?: string;
+}
+
 interface MeetingActions {
   loadMeetings: () => Promise<void>;
-  createMeeting: (data: {
-    name?: string;
-    location?: string;
-    type: MeetingType;
-    moodBefore: number;
-    moodAfter: number;
-    keyTakeaways: string;
-    topicTags: string[];
-    attendedAt?: Date;
-  }) => Promise<MeetingLog>;
-  updateMeeting: (id: string, data: Partial<{
-    name: string;
-    location: string;
-    type: MeetingType;
-    moodBefore: number;
-    moodAfter: number;
-    keyTakeaways: string;
-    topicTags: string[];
-    attendedAt: Date;
-  }>) => Promise<void>;
+  createMeeting: (data: CreateMeetingData) => Promise<MeetingLog>;
+  updateMeeting: (id: string, data: UpdateMeetingData) => Promise<void>;
   deleteMeeting: (id: string) => Promise<void>;
   getMeetingById: (id: string) => Promise<MeetingLog | null>;
   calculateInsights: () => void;
@@ -65,6 +86,7 @@ const initialInsights: MeetingInsights = {
   mostCommonTopic: null,
   lastMeetingDate: null,
   daysSinceLastMeeting: null,
+  shareRate: 0,
 };
 
 export const useMeetingStore = create<MeetingState & MeetingActions>((set, get) => ({
@@ -92,6 +114,14 @@ export const useMeetingStore = create<MeetingState & MeetingActions>((set, get) 
           topicTags: row.topic_tags ? JSON.parse(row.topic_tags) : [],
           attendedAt: new Date(row.attended_at),
           createdAt: new Date(row.created_at),
+          // Enhanced fields
+          whatILearned: row.what_i_learned ? await decryptContent(row.what_i_learned) : undefined,
+          quoteHeard: row.quote_heard ? await decryptContent(row.quote_heard) : undefined,
+          connectionsMode: row.connections_mode ? JSON.parse(row.connections_mode) : undefined,
+          connectionNotes: row.connection_notes ? await decryptContent(row.connection_notes) : undefined,
+          didShare: row.did_share === 1,
+          shareReflection: row.share_reflection ? await decryptContent(row.share_reflection) : undefined,
+          regularMeetingId: row.regular_meeting_id || undefined,
         }))
       );
 
@@ -108,16 +138,31 @@ export const useMeetingStore = create<MeetingState & MeetingActions>((set, get) 
     const now = new Date();
     const attendedAt = data.attendedAt || now;
 
+    // Encrypt sensitive fields
     const encryptedTakeaways = data.keyTakeaways
       ? await encryptContent(data.keyTakeaways)
       : '';
+    const encryptedWhatILearned = data.whatILearned
+      ? await encryptContent(data.whatILearned)
+      : null;
+    const encryptedQuoteHeard = data.quoteHeard
+      ? await encryptContent(data.quoteHeard)
+      : null;
+    const encryptedConnectionNotes = data.connectionNotes
+      ? await encryptContent(data.connectionNotes)
+      : null;
+    const encryptedShareReflection = data.shareReflection
+      ? await encryptContent(data.shareReflection)
+      : null;
 
     const db = await getDatabase();
     await db.runAsync(
       `INSERT INTO meeting_logs (
         id, name, location, type, mood_before, mood_after,
-        key_takeaways, topic_tags, attended_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        key_takeaways, topic_tags, attended_at, created_at,
+        what_i_learned, quote_heard, connections_mode, connection_notes,
+        did_share, share_reflection, regular_meeting_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.name || null,
@@ -129,6 +174,13 @@ export const useMeetingStore = create<MeetingState & MeetingActions>((set, get) 
         JSON.stringify(data.topicTags),
         attendedAt.toISOString(),
         now.toISOString(),
+        encryptedWhatILearned,
+        encryptedQuoteHeard,
+        data.connectionsMode ? JSON.stringify(data.connectionsMode) : null,
+        encryptedConnectionNotes,
+        data.didShare ? 1 : 0,
+        encryptedShareReflection,
+        data.regularMeetingId || null,
       ]
     );
 
@@ -143,6 +195,13 @@ export const useMeetingStore = create<MeetingState & MeetingActions>((set, get) 
       topicTags: data.topicTags,
       attendedAt,
       createdAt: now,
+      whatILearned: data.whatILearned,
+      quoteHeard: data.quoteHeard,
+      connectionsMode: data.connectionsMode,
+      connectionNotes: data.connectionNotes,
+      didShare: data.didShare || false,
+      shareReflection: data.shareReflection,
+      regularMeetingId: data.regularMeetingId,
     };
 
     set((state) => ({
@@ -199,6 +258,35 @@ export const useMeetingStore = create<MeetingState & MeetingActions>((set, get) 
       updates.push('attended_at = ?');
       values.push(data.attendedAt.toISOString());
     }
+    // Enhanced fields
+    if (data.whatILearned !== undefined) {
+      updates.push('what_i_learned = ?');
+      values.push(data.whatILearned ? await encryptContent(data.whatILearned) : null);
+    }
+    if (data.quoteHeard !== undefined) {
+      updates.push('quote_heard = ?');
+      values.push(data.quoteHeard ? await encryptContent(data.quoteHeard) : null);
+    }
+    if (data.connectionsMode !== undefined) {
+      updates.push('connections_mode = ?');
+      values.push(data.connectionsMode ? JSON.stringify(data.connectionsMode) : null);
+    }
+    if (data.connectionNotes !== undefined) {
+      updates.push('connection_notes = ?');
+      values.push(data.connectionNotes ? await encryptContent(data.connectionNotes) : null);
+    }
+    if (data.didShare !== undefined) {
+      updates.push('did_share = ?');
+      values.push(data.didShare ? 1 : 0);
+    }
+    if (data.shareReflection !== undefined) {
+      updates.push('share_reflection = ?');
+      values.push(data.shareReflection ? await encryptContent(data.shareReflection) : null);
+    }
+    if (data.regularMeetingId !== undefined) {
+      updates.push('regular_meeting_id = ?');
+      values.push(data.regularMeetingId || null);
+    }
 
     if (updates.length === 0) return;
 
@@ -251,6 +339,14 @@ export const useMeetingStore = create<MeetingState & MeetingActions>((set, get) 
         topicTags: row.topic_tags ? JSON.parse(row.topic_tags) : [],
         attendedAt: new Date(row.attended_at),
         createdAt: new Date(row.created_at),
+        // Enhanced fields
+        whatILearned: row.what_i_learned ? await decryptContent(row.what_i_learned) : undefined,
+        quoteHeard: row.quote_heard ? await decryptContent(row.quote_heard) : undefined,
+        connectionsMode: row.connections_mode ? JSON.parse(row.connections_mode) : undefined,
+        connectionNotes: row.connection_notes ? await decryptContent(row.connection_notes) : undefined,
+        didShare: row.did_share === 1,
+        shareReflection: row.share_reflection ? await decryptContent(row.share_reflection) : undefined,
+        regularMeetingId: row.regular_meeting_id || undefined,
       };
     } catch (error) {
       console.error('Failed to get meeting:', error);
@@ -302,6 +398,10 @@ export const useMeetingStore = create<MeetingState & MeetingActions>((set, get) 
       ? Math.floor((now.getTime() - lastMeetingDate.getTime()) / (1000 * 60 * 60 * 24))
       : null;
 
+    // Share rate
+    const meetingsWithShares = meetings.filter((m) => m.didShare).length;
+    const shareRate = meetings.length > 0 ? (meetingsWithShares / meetings.length) * 100 : 0;
+
     set({
       insights: {
         totalMeetings: meetings.length,
@@ -311,6 +411,7 @@ export const useMeetingStore = create<MeetingState & MeetingActions>((set, get) 
         mostCommonTopic,
         lastMeetingDate,
         daysSinceLastMeeting,
+        shareRate,
       },
     });
 
@@ -320,4 +421,3 @@ export const useMeetingStore = create<MeetingState & MeetingActions>((set, get) 
     }
   },
 }));
-

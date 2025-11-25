@@ -91,10 +91,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "your-eas-project-id"
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
       }
     },
-    "owner": "your-expo-username",
+    "owner": "REPLACE_WITH_EXPO_USERNAME",
     "runtimeVersion": {
       "policy": "appVersion"
     },

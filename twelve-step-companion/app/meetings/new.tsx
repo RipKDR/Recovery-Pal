@@ -1,9 +1,9 @@
 /**
  * New Meeting Screen
- * Log a meeting with mood, takeaways, and topics
+ * Log a meeting with mood, takeaways, connections, and topics
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,19 +13,29 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Card, Button, Slider } from '../../components/ui';
 import { useMeetings } from '../../lib/hooks/useMeetings';
+import { useRegularMeetings } from '../../lib/hooks/useRegularMeetings';
 import { MEETING_TOPICS } from '../../lib/constants/meetingTopics';
-import type { MeetingType } from '../../lib/types';
+import type { MeetingType, MeetingConnectionMode } from '../../lib/types';
+
+const CONNECTION_OPTIONS: { value: MeetingConnectionMode; label: string; icon: string }[] = [
+  { value: 'got_number', label: 'Got a number', icon: '📱' },
+  { value: 'conversation', label: 'Had a conversation', icon: '💬' },
+  { value: 'made_plans', label: 'Made plans', icon: '📅' },
+  { value: 'sponsor_chat', label: 'Talked to sponsor', icon: '⭐' },
+];
 
 export default function NewMeetingScreen() {
   const router = useRouter();
   const { createMeeting } = useMeetings();
+  const { meetings: regularMeetings, todayMeetings } = useRegularMeetings();
 
-  // Form state
+  // Form state - Basic
   const [meetingName, setMeetingName] = useState('');
   const [location, setLocation] = useState('');
   const [meetingType, setMeetingType] = useState<MeetingType>('in-person');
@@ -33,11 +43,32 @@ export default function NewMeetingScreen() {
   const [moodAfter, setMoodAfter] = useState(5);
   const [keyTakeaways, setKeyTakeaways] = useState('');
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  
+  // Form state - Enhanced (Phase 2)
+  const [whatILearned, setWhatILearned] = useState('');
+  const [quoteHeard, setQuoteHeard] = useState('');
+  const [selectedConnections, setSelectedConnections] = useState<MeetingConnectionMode[]>([]);
+  const [connectionNotes, setConnectionNotes] = useState('');
+  const [didShare, setDidShare] = useState(false);
+  const [shareReflection, setShareReflection] = useState('');
+  const [selectedRegularMeetingId, setSelectedRegularMeetingId] = useState<string | undefined>();
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Current step in the flow
   const [step, setStep] = useState(1);
-  const totalSteps = 4;
+  const totalSteps = 5;
+
+  // Pre-fill from today's meetings if available
+  useEffect(() => {
+    if (todayMeetings.length > 0) {
+      const meeting = todayMeetings[0];
+      setMeetingName(meeting.name);
+      setLocation(meeting.location || '');
+      setMeetingType(meeting.type as MeetingType);
+      setSelectedRegularMeetingId(meeting.id);
+    }
+  }, [todayMeetings]);
 
   const getMoodEmoji = (mood: number) => {
     if (mood <= 2) return '😢';
@@ -52,6 +83,14 @@ export default function NewMeetingScreen() {
       prev.includes(topic)
         ? prev.filter((t) => t !== topic)
         : [...prev, topic]
+    );
+  };
+
+  const toggleConnection = (connection: MeetingConnectionMode) => {
+    setSelectedConnections((prev) =>
+      prev.includes(connection)
+        ? prev.filter((c) => c !== connection)
+        : [...prev, connection]
     );
   };
 
@@ -80,11 +119,19 @@ export default function NewMeetingScreen() {
         moodAfter,
         keyTakeaways,
         topicTags: selectedTopics,
+        // Enhanced fields
+        whatILearned: whatILearned || undefined,
+        quoteHeard: quoteHeard || undefined,
+        connectionsMode: selectedConnections.length > 0 ? selectedConnections : undefined,
+        connectionNotes: connectionNotes || undefined,
+        didShare,
+        shareReflection: shareReflection || undefined,
+        regularMeetingId: selectedRegularMeetingId,
       });
 
       Alert.alert(
-        '🎉 Meeting Logged!',
-        'Your meeting has been recorded. Keep it up!',
+        'Meeting Logged!',
+        'Your meeting has been recorded. Keep coming back!',
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (error) {
@@ -134,6 +181,45 @@ export default function NewMeetingScreen() {
               <Text className="text-surface-500 mb-6">
                 What meeting did you attend?
               </Text>
+
+              {/* Quick Select from Regular Meetings */}
+              {regularMeetings.length > 0 && (
+                <View className="mb-6">
+                  <Text className="text-sm font-medium text-surface-600 dark:text-surface-400 mb-2">
+                    Quick Select
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View className="flex-row gap-2">
+                      {regularMeetings.slice(0, 5).map((meeting) => (
+                        <TouchableOpacity
+                          key={meeting.id}
+                          onPress={() => {
+                            setMeetingName(meeting.name);
+                            setLocation(meeting.location || '');
+                            setMeetingType(meeting.type as MeetingType);
+                            setSelectedRegularMeetingId(meeting.id);
+                          }}
+                          className={`px-4 py-2 rounded-lg border ${
+                            selectedRegularMeetingId === meeting.id
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30'
+                              : 'border-surface-200 dark:border-surface-700'
+                          }`}
+                        >
+                          <Text
+                            className={`text-sm ${
+                              selectedRegularMeetingId === meeting.id
+                                ? 'text-primary-700 dark:text-primary-300 font-medium'
+                                : 'text-surface-600 dark:text-surface-400'
+                            }`}
+                          >
+                            {meeting.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              )}
 
               {/* Meeting Type */}
               <Text className="text-base font-medium text-surface-700 dark:text-surface-300 mb-3">
@@ -210,68 +296,61 @@ export default function NewMeetingScreen() {
             </View>
           )}
 
-          {/* Step 2: Mood Before */}
+          {/* Step 2: Mood Before & After */}
           {step === 2 && (
             <View>
               <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">
-                Before the Meeting
+                How Did It Go?
               </Text>
               <Text className="text-surface-500 mb-8">
-                How were you feeling before attending?
+                Track your mood before and after the meeting
               </Text>
 
-              <View className="items-center mb-8">
-                <Text className="text-8xl mb-4">{getMoodEmoji(moodBefore)}</Text>
-                <Text className="text-4xl font-bold text-surface-900 dark:text-surface-100">
-                  {moodBefore}/10
+              {/* Mood Before */}
+              <Card variant="default" className="mb-6">
+                <Text className="text-base font-medium text-surface-700 dark:text-surface-300 mb-4">
+                  Before the meeting
                 </Text>
-              </View>
+                <View className="items-center mb-4">
+                  <Text className="text-6xl mb-2">{getMoodEmoji(moodBefore)}</Text>
+                  <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+                    {moodBefore}/10
+                  </Text>
+                </View>
+                <Slider
+                  value={moodBefore}
+                  onValueChange={setMoodBefore}
+                  min={1}
+                  max={10}
+                  step={1}
+                />
+              </Card>
 
-              <Slider
-                value={moodBefore}
-                onValueChange={setMoodBefore}
-                min={1}
-                max={10}
-                step={1}
-              />
-
-              <View className="flex-row justify-between mt-4">
-                <Text className="text-sm text-surface-400">Struggling</Text>
-                <Text className="text-sm text-surface-400">Great</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Step 3: Mood After & Takeaways */}
-          {step === 3 && (
-            <View>
-              <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">
-                After the Meeting
-              </Text>
-              <Text className="text-surface-500 mb-6">
-                How do you feel now?
-              </Text>
-
-              <View className="items-center mb-6">
-                <Text className="text-6xl mb-2">{getMoodEmoji(moodAfter)}</Text>
-                <Text className="text-3xl font-bold text-surface-900 dark:text-surface-100">
-                  {moodAfter}/10
+              {/* Mood After */}
+              <Card variant="default" className="mb-4">
+                <Text className="text-base font-medium text-surface-700 dark:text-surface-300 mb-4">
+                  After the meeting
                 </Text>
-              </View>
-
-              <Slider
-                value={moodAfter}
-                onValueChange={setMoodAfter}
-                min={1}
-                max={10}
-                step={1}
-              />
+                <View className="items-center mb-4">
+                  <Text className="text-6xl mb-2">{getMoodEmoji(moodAfter)}</Text>
+                  <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+                    {moodAfter}/10
+                  </Text>
+                </View>
+                <Slider
+                  value={moodAfter}
+                  onValueChange={setMoodAfter}
+                  min={1}
+                  max={10}
+                  step={1}
+                />
+              </Card>
 
               {/* Mood change indicator */}
               {moodAfter !== moodBefore && (
                 <Card
                   variant="default"
-                  className={`mt-4 ${
+                  className={`${
                     moodAfter > moodBefore
                       ? 'bg-green-50 dark:bg-green-900/30'
                       : 'bg-amber-50 dark:bg-amber-900/30'
@@ -294,9 +373,21 @@ export default function NewMeetingScreen() {
                   </View>
                 </Card>
               )}
+            </View>
+          )}
+
+          {/* Step 3: Reflections */}
+          {step === 3 && (
+            <View>
+              <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">
+                Meeting Reflections
+              </Text>
+              <Text className="text-surface-500 mb-6">
+                What stood out to you?
+              </Text>
 
               {/* Key Takeaways */}
-              <Text className="text-base font-medium text-surface-700 dark:text-surface-300 mt-6 mb-2">
+              <Text className="text-base font-medium text-surface-700 dark:text-surface-300 mb-2">
                 Key Takeaways
               </Text>
               <TextInput
@@ -305,15 +396,143 @@ export default function NewMeetingScreen() {
                 placeholder="What resonated with you today?"
                 placeholderTextColor="#9ca3af"
                 multiline
-                numberOfLines={4}
-                className="bg-surface-100 dark:bg-surface-800 rounded-xl px-4 py-3 text-surface-900 dark:text-surface-100 min-h-[100px]"
+                numberOfLines={3}
+                className="bg-surface-100 dark:bg-surface-800 rounded-xl px-4 py-3 text-surface-900 dark:text-surface-100 min-h-[80px] mb-4"
                 textAlignVertical="top"
+              />
+
+              {/* What I Learned */}
+              <Text className="text-base font-medium text-surface-700 dark:text-surface-300 mb-2">
+                What did I learn?
+              </Text>
+              <TextInput
+                value={whatILearned}
+                onChangeText={setWhatILearned}
+                placeholder="Something new I discovered..."
+                placeholderTextColor="#9ca3af"
+                multiline
+                numberOfLines={2}
+                className="bg-surface-100 dark:bg-surface-800 rounded-xl px-4 py-3 text-surface-900 dark:text-surface-100 min-h-[60px] mb-4"
+                textAlignVertical="top"
+              />
+
+              {/* Quote Heard */}
+              <Text className="text-base font-medium text-surface-700 dark:text-surface-300 mb-2">
+                Something I heard (quote or phrase)
+              </Text>
+              <TextInput
+                value={quoteHeard}
+                onChangeText={setQuoteHeard}
+                placeholder='"Progress, not perfection..."'
+                placeholderTextColor="#9ca3af"
+                className="bg-surface-100 dark:bg-surface-800 rounded-xl px-4 py-3 text-surface-900 dark:text-surface-100 mb-4"
               />
             </View>
           )}
 
-          {/* Step 4: Topics */}
+          {/* Step 4: Connections & Sharing */}
           {step === 4 && (
+            <View>
+              <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">
+                Fellowship Connections
+              </Text>
+              <Text className="text-surface-500 mb-6">
+                How did you connect with others?
+              </Text>
+
+              {/* Connection Types */}
+              <Text className="text-base font-medium text-surface-700 dark:text-surface-300 mb-3">
+                What connections did you make?
+              </Text>
+              <View className="flex-row flex-wrap gap-2 mb-6">
+                {CONNECTION_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    onPress={() => toggleConnection(option.value)}
+                    className={`px-4 py-2 rounded-full border ${
+                      selectedConnections.includes(option.value)
+                        ? 'bg-green-500 border-green-500'
+                        : 'border-surface-300 dark:border-surface-600'
+                    }`}
+                  >
+                    <Text
+                      className={`${
+                        selectedConnections.includes(option.value)
+                          ? 'text-white'
+                          : 'text-surface-700 dark:text-surface-300'
+                      }`}
+                    >
+                      {option.icon} {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Connection Notes */}
+              {selectedConnections.length > 0 && (
+                <>
+                  <Text className="text-base font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    Notes about connections (optional)
+                  </Text>
+                  <TextInput
+                    value={connectionNotes}
+                    onChangeText={setConnectionNotes}
+                    placeholder="Names, topics discussed..."
+                    placeholderTextColor="#9ca3af"
+                    multiline
+                    numberOfLines={2}
+                    className="bg-surface-100 dark:bg-surface-800 rounded-xl px-4 py-3 text-surface-900 dark:text-surface-100 min-h-[60px] mb-6"
+                    textAlignVertical="top"
+                  />
+                </>
+              )}
+
+              {/* Did You Share? */}
+              <Card variant="default" className="mb-4">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center flex-1">
+                    <Text className="text-2xl mr-3">🎤</Text>
+                    <View className="flex-1">
+                      <Text className="text-surface-900 dark:text-surface-100 font-medium">
+                        Did you share?
+                      </Text>
+                      <Text className="text-sm text-surface-500">
+                        Even just saying your name counts!
+                      </Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={didShare}
+                    onValueChange={setDidShare}
+                    trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
+                    thumbColor={didShare ? '#3b82f6' : '#f4f4f5'}
+                  />
+                </View>
+              </Card>
+
+              {/* Share Reflection */}
+              {didShare && (
+                <>
+                  <Text className="text-base font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    How did it feel to share?
+                  </Text>
+                  <TextInput
+                    value={shareReflection}
+                    onChangeText={setShareReflection}
+                    placeholder="Nervous at first, but felt good after..."
+                    placeholderTextColor="#9ca3af"
+                    multiline
+                    numberOfLines={2}
+                    className="bg-surface-100 dark:bg-surface-800 rounded-xl px-4 py-3 text-surface-900 dark:text-surface-100 min-h-[60px]"
+                    textAlignVertical="top"
+                  />
+                </>
+              )}
+            </View>
+          )}
+
+          {/* Step 5: Topics & Summary */}
+          {step === 5 && (
             <View>
               <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">
                 Topics Discussed
@@ -351,41 +570,55 @@ export default function NewMeetingScreen() {
                 <Text className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">
                   Meeting Summary
                 </Text>
-                <View className="flex-row justify-between mb-2">
-                  <Text className="text-surface-500">Type</Text>
-                  <Text className="text-surface-900 dark:text-surface-100">
-                    {meetingType === 'in-person' ? '📍 In Person' : '💻 Online'}
-                  </Text>
-                </View>
-                {meetingName && (
-                  <View className="flex-row justify-between mb-2">
-                    <Text className="text-surface-500">Name</Text>
+                <View className="space-y-2">
+                  <View className="flex-row justify-between">
+                    <Text className="text-surface-500">Type</Text>
                     <Text className="text-surface-900 dark:text-surface-100">
-                      {meetingName}
+                      {meetingType === 'in-person' ? '📍 In Person' : '💻 Online'}
                     </Text>
                   </View>
-                )}
-                <View className="flex-row justify-between mb-2">
-                  <Text className="text-surface-500">Mood Change</Text>
-                  <Text
-                    className={
-                      moodAfter > moodBefore
-                        ? 'text-green-600 font-medium'
-                        : moodAfter < moodBefore
-                        ? 'text-red-600 font-medium'
-                        : 'text-surface-900 dark:text-surface-100'
-                    }
-                  >
-                    {moodBefore} → {moodAfter}{' '}
-                    {moodAfter > moodBefore && '📈'}
-                    {moodAfter < moodBefore && '📉'}
-                  </Text>
-                </View>
-                <View className="flex-row justify-between">
-                  <Text className="text-surface-500">Topics</Text>
-                  <Text className="text-surface-900 dark:text-surface-100">
-                    {selectedTopics.length || 'None'}
-                  </Text>
+                  {meetingName && (
+                    <View className="flex-row justify-between">
+                      <Text className="text-surface-500">Name</Text>
+                      <Text className="text-surface-900 dark:text-surface-100">
+                        {meetingName}
+                      </Text>
+                    </View>
+                  )}
+                  <View className="flex-row justify-between">
+                    <Text className="text-surface-500">Mood Change</Text>
+                    <Text
+                      className={
+                        moodAfter > moodBefore
+                          ? 'text-green-600 font-medium'
+                          : moodAfter < moodBefore
+                          ? 'text-red-600 font-medium'
+                          : 'text-surface-900 dark:text-surface-100'
+                      }
+                    >
+                      {moodBefore} → {moodAfter}{' '}
+                      {moodAfter > moodBefore && '📈'}
+                      {moodAfter < moodBefore && '📉'}
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between">
+                    <Text className="text-surface-500">Topics</Text>
+                    <Text className="text-surface-900 dark:text-surface-100">
+                      {selectedTopics.length || 'None'}
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between">
+                    <Text className="text-surface-500">Connections</Text>
+                    <Text className="text-surface-900 dark:text-surface-100">
+                      {selectedConnections.length || 'None'}
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between">
+                    <Text className="text-surface-500">Shared</Text>
+                    <Text className="text-surface-900 dark:text-surface-100">
+                      {didShare ? '✓ Yes' : 'No'}
+                    </Text>
+                  </View>
                 </View>
               </Card>
             </View>
@@ -409,4 +642,3 @@ export default function NewMeetingScreen() {
     </SafeAreaView>
   );
 }
-

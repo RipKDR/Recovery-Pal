@@ -15,6 +15,10 @@ export default function StepWorkLayout() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="[step]" />
+      <Stack.Screen name="4/inventory" />
+      <Stack.Screen name="8-9" />
+      <Stack.Screen name="10" />
+      <Stack.Screen name="11" />
     </Stack>
   );
 }

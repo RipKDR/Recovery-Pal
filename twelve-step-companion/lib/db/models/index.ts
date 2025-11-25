@@ -24,6 +24,15 @@ import type {
   MilestoneType,
   ProgramType,
   ThemeMode,
+  CrisisRegion,
+  // V2 Types
+  RecoveryContact,
+  DbRecoveryContact,
+  ContactRole,
+  PhoneCallLog,
+  DbPhoneCallLog,
+  DailyReadingReflection,
+  DbDailyReadingReflection,
 } from '../../types';
 
 // ============================================
@@ -439,6 +448,7 @@ export async function getAppSettings(): Promise<AppSettings | null> {
     biometricEnabled: row.biometric_enabled === 1,
     themeMode: row.theme_mode as ThemeMode,
     notificationsEnabled: row.notifications_enabled === 1,
+    crisisRegion: (row.crisis_region || 'US') as CrisisRegion,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -459,6 +469,7 @@ export async function createOrUpdateAppSettings(
         biometric_enabled = ?,
         theme_mode = ?,
         notifications_enabled = ?,
+        crisis_region = ?,
         updated_at = ?
        WHERE id = ?`,
       [
@@ -467,6 +478,7 @@ export async function createOrUpdateAppSettings(
         (settings.biometricEnabled ?? existing.biometricEnabled) ? 1 : 0,
         settings.themeMode ?? existing.themeMode,
         (settings.notificationsEnabled ?? existing.notificationsEnabled) ? 1 : 0,
+        settings.crisisRegion ?? existing.crisisRegion,
         now,
         existing.id,
       ]
@@ -480,8 +492,8 @@ export async function createOrUpdateAppSettings(
   } else {
     const id = uuidv4();
     await db.runAsync(
-      `INSERT INTO app_settings (id, check_in_time, auto_lock_minutes, biometric_enabled, theme_mode, notifications_enabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO app_settings (id, check_in_time, auto_lock_minutes, biometric_enabled, theme_mode, notifications_enabled, crisis_region, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         settings.checkInTime || '09:00',
@@ -489,6 +501,7 @@ export async function createOrUpdateAppSettings(
         settings.biometricEnabled !== false ? 1 : 0,
         settings.themeMode || 'system',
         settings.notificationsEnabled !== false ? 1 : 0,
+        settings.crisisRegion || 'US',
         now,
         now,
       ]
@@ -501,9 +514,355 @@ export async function createOrUpdateAppSettings(
       biometricEnabled: settings.biometricEnabled !== false,
       themeMode: settings.themeMode || 'system',
       notificationsEnabled: settings.notificationsEnabled !== false,
+      crisisRegion: settings.crisisRegion || 'US',
       createdAt: new Date(now),
       updatedAt: new Date(now),
     };
   }
+}
+
+// ============================================
+// RECOVERY CONTACTS (V2)
+// ============================================
+
+export async function createRecoveryContact(
+  name: string,
+  phone: string,
+  role: ContactRole,
+  notes?: string
+): Promise<RecoveryContact> {
+  const db = await getDatabase();
+  const id = uuidv4();
+  const now = new Date().toISOString();
+
+  // Encrypt notes if provided
+  const encryptedNotes = notes ? await encryptContent(notes) : null;
+
+  await db.runAsync(
+    `INSERT INTO recovery_contacts (id, name, phone, role, notes, last_contacted_at, created_at)
+     VALUES (?, ?, ?, ?, ?, NULL, ?)`,
+    [id, name, phone, role, encryptedNotes, now]
+  );
+
+  return {
+    id,
+    name,
+    phone,
+    role,
+    notes: encryptedNotes || undefined,
+    createdAt: new Date(now),
+  };
+}
+
+export async function getRecoveryContacts(): Promise<RecoveryContact[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<DbRecoveryContact>(
+    'SELECT * FROM recovery_contacts ORDER BY role, name'
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    role: row.role as ContactRole,
+    notes: row.notes || undefined,
+    lastContactedAt: row.last_contacted_at ? new Date(row.last_contacted_at) : undefined,
+    createdAt: new Date(row.created_at),
+  }));
+}
+
+export async function getRecoveryContactById(id: string): Promise<RecoveryContact | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<DbRecoveryContact>(
+    'SELECT * FROM recovery_contacts WHERE id = ?',
+    [id]
+  );
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    role: row.role as ContactRole,
+    notes: row.notes || undefined,
+    lastContactedAt: row.last_contacted_at ? new Date(row.last_contacted_at) : undefined,
+    createdAt: new Date(row.created_at),
+  };
+}
+
+export async function getContactsByRole(role: ContactRole): Promise<RecoveryContact[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<DbRecoveryContact>(
+    'SELECT * FROM recovery_contacts WHERE role = ? ORDER BY name',
+    [role]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    role: row.role as ContactRole,
+    notes: row.notes || undefined,
+    lastContactedAt: row.last_contacted_at ? new Date(row.last_contacted_at) : undefined,
+    createdAt: new Date(row.created_at),
+  }));
+}
+
+export async function getSponsor(): Promise<RecoveryContact | null> {
+  const sponsors = await getContactsByRole('sponsor');
+  return sponsors[0] || null;
+}
+
+export async function updateRecoveryContact(
+  id: string,
+  updates: Partial<Pick<RecoveryContact, 'name' | 'phone' | 'role' | 'notes'>>
+): Promise<void> {
+  const db = await getDatabase();
+  const updateFields: string[] = [];
+  const values: (string | null)[] = [];
+
+  if (updates.name !== undefined) {
+    updateFields.push('name = ?');
+    values.push(updates.name);
+  }
+  if (updates.phone !== undefined) {
+    updateFields.push('phone = ?');
+    values.push(updates.phone);
+  }
+  if (updates.role !== undefined) {
+    updateFields.push('role = ?');
+    values.push(updates.role);
+  }
+  if (updates.notes !== undefined) {
+    updateFields.push('notes = ?');
+    values.push(updates.notes ? await encryptContent(updates.notes) : null);
+  }
+
+  if (updateFields.length === 0) return;
+
+  values.push(id);
+  await db.runAsync(
+    `UPDATE recovery_contacts SET ${updateFields.join(', ')} WHERE id = ?`,
+    values
+  );
+}
+
+export async function updateContactLastContacted(id: string): Promise<void> {
+  const db = await getDatabase();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    'UPDATE recovery_contacts SET last_contacted_at = ? WHERE id = ?',
+    [now, id]
+  );
+}
+
+export async function deleteRecoveryContact(id: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM recovery_contacts WHERE id = ?', [id]);
+}
+
+// ============================================
+// PHONE CALL LOGS (V2)
+// ============================================
+
+export async function createPhoneCallLog(
+  contactId: string,
+  contactName: string,
+  duration?: number,
+  notes?: string
+): Promise<PhoneCallLog> {
+  const db = await getDatabase();
+  const id = uuidv4();
+  const now = new Date();
+
+  // Encrypt notes if provided
+  const encryptedNotes = notes ? await encryptContent(notes) : null;
+
+  await db.runAsync(
+    `INSERT INTO phone_call_logs (id, contact_id, contact_name, duration, notes, called_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, contactId, contactName, duration || null, encryptedNotes, now.toISOString()]
+  );
+
+  // Update the contact's last contacted time
+  await updateContactLastContacted(contactId);
+
+  return {
+    id,
+    contactId,
+    contactName,
+    duration,
+    notes: encryptedNotes || undefined,
+    calledAt: now,
+  };
+}
+
+export async function getPhoneCallLogs(limit = 50): Promise<PhoneCallLog[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<DbPhoneCallLog>(
+    'SELECT * FROM phone_call_logs ORDER BY called_at DESC LIMIT ?',
+    [limit]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    contactId: row.contact_id,
+    contactName: row.contact_name,
+    duration: row.duration || undefined,
+    notes: row.notes || undefined,
+    calledAt: new Date(row.called_at),
+  }));
+}
+
+export async function getTodayCallLogs(): Promise<PhoneCallLog[]> {
+  const db = await getDatabase();
+  const today = new Date().toISOString().split('T')[0];
+
+  const rows = await db.getAllAsync<DbPhoneCallLog>(
+    `SELECT * FROM phone_call_logs 
+     WHERE date(called_at) = ? 
+     ORDER BY called_at DESC`,
+    [today]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    contactId: row.contact_id,
+    contactName: row.contact_name,
+    duration: row.duration || undefined,
+    notes: row.notes || undefined,
+    calledAt: new Date(row.called_at),
+  }));
+}
+
+export async function getCallLogsByContact(contactId: string): Promise<PhoneCallLog[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<DbPhoneCallLog>(
+    'SELECT * FROM phone_call_logs WHERE contact_id = ? ORDER BY called_at DESC',
+    [contactId]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    contactId: row.contact_id,
+    contactName: row.contact_name,
+    duration: row.duration || undefined,
+    notes: row.notes || undefined,
+    calledAt: new Date(row.called_at),
+  }));
+}
+
+export async function deletePhoneCallLog(id: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM phone_call_logs WHERE id = ?', [id]);
+}
+
+// ============================================
+// DAILY READING REFLECTIONS (V2)
+// ============================================
+
+export async function createDailyReadingReflection(
+  readingDate: string,
+  reflection: string
+): Promise<DailyReadingReflection> {
+  const db = await getDatabase();
+  const id = uuidv4();
+  const now = new Date();
+
+  // Encrypt reflection
+  const encryptedReflection = await encryptContent(reflection);
+
+  // Use INSERT OR REPLACE to update if exists for same date
+  await db.runAsync(
+    `INSERT OR REPLACE INTO daily_reading_reflections (id, reading_date, reflection, created_at)
+     VALUES (?, ?, ?, ?)`,
+    [id, readingDate, encryptedReflection, now.toISOString()]
+  );
+
+  return {
+    id,
+    readingDate,
+    reflection: encryptedReflection,
+    createdAt: now,
+  };
+}
+
+export async function getDailyReadingReflection(readingDate: string): Promise<DailyReadingReflection | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<DbDailyReadingReflection>(
+    'SELECT * FROM daily_reading_reflections WHERE reading_date = ?',
+    [readingDate]
+  );
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    readingDate: row.reading_date,
+    reflection: row.reflection,
+    createdAt: new Date(row.created_at),
+  };
+}
+
+export async function getTodayReadingReflection(): Promise<DailyReadingReflection | null> {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const dateKey = `${month}-${day}`;
+
+  return getDailyReadingReflection(dateKey);
+}
+
+export async function getReadingReflections(limit = 30): Promise<DailyReadingReflection[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<DbDailyReadingReflection>(
+    'SELECT * FROM daily_reading_reflections ORDER BY created_at DESC LIMIT ?',
+    [limit]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    readingDate: row.reading_date,
+    reflection: row.reflection,
+    createdAt: new Date(row.created_at),
+  }));
+}
+
+export async function getReadingStreak(): Promise<number> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<DbDailyReadingReflection>(
+    'SELECT * FROM daily_reading_reflections ORDER BY created_at DESC LIMIT 365'
+  );
+
+  if (rows.length === 0) return 0;
+
+  // Calculate streak based on consecutive days with reflections
+  let streak = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < rows.length; i++) {
+    const expectedDate = new Date(today);
+    expectedDate.setDate(expectedDate.getDate() - i);
+    const expectedMonth = String(expectedDate.getMonth() + 1).padStart(2, '0');
+    const expectedDay = String(expectedDate.getDate()).padStart(2, '0');
+    const expectedKey = `${expectedMonth}-${expectedDay}`;
+
+    const hasReflectionForDate = rows.some((row) => row.reading_date === expectedKey);
+
+    if (hasReflectionForDate) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+export async function decryptReflection(reflection: DailyReadingReflection): Promise<string> {
+  return await decryptContent(reflection.reflection);
 }
 

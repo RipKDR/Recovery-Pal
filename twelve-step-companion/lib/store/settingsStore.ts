@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { AppSettings, ThemeMode } from '../types';
+import type { AppSettings, ThemeMode, CrisisRegion } from '../types';
 import { getAppSettings, createOrUpdateAppSettings } from '../db/models';
 import {
   scheduleDailyCheckinReminder,
@@ -25,6 +25,7 @@ interface SettingsStore {
   setBiometricEnabled: (enabled: boolean) => Promise<void>;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
   setNotificationsEnabled: (enabled: boolean) => Promise<boolean>;
+  setCrisisRegion: (region: CrisisRegion) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
@@ -102,6 +103,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
     await get().updateSettings({ notificationsEnabled: enabled });
     return true;
+  },
+
+  setCrisisRegion: async (region: CrisisRegion) => {
+    await get().updateSettings({ crisisRegion: region });
   },
 }));
 
