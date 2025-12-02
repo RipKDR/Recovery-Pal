@@ -221,4 +221,3 @@ export const MeetingCard = memo(MeetingCardComponent, (prevProps, nextProps) => 
     prevProps.compact === nextProps.compact
   );
 });
-

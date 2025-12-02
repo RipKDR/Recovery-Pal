@@ -137,7 +137,11 @@ export const ContactCard = memo(ContactCardComponent, (prevProps, nextProps) => 
     prevProps.contact.name === nextProps.contact.name &&
     prevProps.contact.phone === nextProps.contact.phone &&
     prevProps.contact.lastContactedAt === nextProps.contact.lastContactedAt &&
-    prevProps.showActions === nextProps.showActions
+    prevProps.showActions === nextProps.showActions &&
+    prevProps.onCall === nextProps.onCall &&
+    prevProps.onText === nextProps.onText &&
+    prevProps.onEdit === nextProps.onEdit &&
+    prevProps.onDelete === nextProps.onDelete
   );
 });
 
