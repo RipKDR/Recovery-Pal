@@ -3,7 +3,7 @@
  * Main recovery overview with daily reading, sobriety counter, and quick actions
  */
 
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -38,22 +38,59 @@ export default function DashboardScreen() {
 
   const { insights } = useMeetings();
 
-  // Get greeting based on time of day
-  const getGreeting = () => {
+  // Memoized greeting based on time of day
+  const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
-  };
+  }, []);
 
-  // Get formatted date
-  const getFormattedDate = () => {
+  // Memoized formatted date
+  const formattedDate = useMemo(() => {
     return new Date().toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
     });
-  };
+  }, []);
+
+  // Memoized navigation handlers
+  const handleNavigateToSettings = useCallback(() => {
+    router.push('/settings');
+  }, [router]);
+
+  const handleNavigateToOnboarding = useCallback(() => {
+    router.push('/onboarding/welcome');
+  }, [router]);
+
+  const handleNavigateToCheckin = useCallback(() => {
+    router.push('/checkin');
+  }, [router]);
+
+  const handleNavigateToVault = useCallback(() => {
+    router.push('/vault');
+  }, [router]);
+
+  const handleNavigateToJournalNew = useCallback(() => {
+    router.push('/journal/new');
+  }, [router]);
+
+  const handleNavigateToMyMeetings = useCallback(() => {
+    router.push('/my-meetings');
+  }, [router]);
+
+  const handleNavigateToContacts = useCallback(() => {
+    router.push('/contacts');
+  }, [router]);
+
+  const handleNavigateToTools = useCallback(() => {
+    router.push('/(tabs)/tools');
+  }, [router]);
+
+  const handleNavigateToReport = useCallback(() => {
+    router.push('/report');
+  }, [router]);
 
   // If no profile, show onboarding prompt
   if (!sobrietyLoading && !profile) {
@@ -72,7 +109,7 @@ export default function DashboardScreen() {
           </Text>
           <Button
             title="Get Started"
-            onPress={() => router.push('/onboarding/welcome')}
+            onPress={handleNavigateToOnboarding}
             size="lg"
             accessibilityLabel="Get started with Recovery Companion"
             accessibilityHint="Tap to begin setting up your recovery profile"
@@ -90,11 +127,11 @@ export default function DashboardScreen() {
           <View accessible accessibilityRole="header" className="flex-1">
             <View className="flex-row items-baseline">
               <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100">
-                {getGreeting()}{profile?.displayName ? `, ${profile.displayName}` : ''}
+                {greeting}{profile?.displayName ? `, ${profile.displayName}` : ''}
               </Text>
             </View>
             <Text className="text-surface-500 mt-1">
-              {getFormattedDate()}
+              {formattedDate}
             </Text>
           </View>
           <View className="flex-row items-center gap-2">
@@ -105,7 +142,7 @@ export default function DashboardScreen() {
               </Text>
             </View>
             <TouchableOpacity
-              onPress={() => router.push('/settings')}
+              onPress={handleNavigateToSettings}
               className="w-10 h-10 bg-surface-100 dark:bg-surface-800 rounded-full items-center justify-center"
               accessibilityRole="button"
               accessibilityLabel="Open settings"
@@ -148,7 +185,7 @@ export default function DashboardScreen() {
             </View>
             <Button
               title="Check In Now"
-              onPress={() => router.push('/checkin')}
+              onPress={handleNavigateToCheckin}
               variant="primary"
               accessibilityLabel="Start daily check-in"
               accessibilityHint="Record your mood and cravings for today"
@@ -176,7 +213,7 @@ export default function DashboardScreen() {
             {/* High craving support */}
             {todayCheckin?.cravingLevel && todayCheckin.cravingLevel > 5 && (
               <TouchableOpacity
-                onPress={() => router.push('/vault')}
+                onPress={handleNavigateToVault}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel="Open Motivation Vault"
@@ -248,7 +285,7 @@ export default function DashboardScreen() {
           </Text>
           <View className="flex-row flex-wrap gap-3">
             <TouchableOpacity
-              onPress={() => router.push('/journal/new')}
+              onPress={handleNavigateToJournalNew}
               className="bg-primary-100 dark:bg-primary-900/30 rounded-xl px-4 py-3 flex-row items-center gap-2"
               accessibilityRole="button"
               accessibilityLabel="New Journal Entry"
@@ -260,7 +297,7 @@ export default function DashboardScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => router.push('/my-meetings')}
+              onPress={handleNavigateToMyMeetings}
               className="bg-blue-100 dark:bg-blue-900/30 rounded-xl px-4 py-3 flex-row items-center gap-2"
               accessibilityRole="button"
               accessibilityLabel="My Meetings"
@@ -272,7 +309,7 @@ export default function DashboardScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => router.push('/contacts')}
+              onPress={handleNavigateToContacts}
               className="bg-green-100 dark:bg-green-900/30 rounded-xl px-4 py-3 flex-row items-center gap-2"
               accessibilityRole="button"
               accessibilityLabel="Recovery Contacts"
@@ -284,7 +321,7 @@ export default function DashboardScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => router.push('/(tabs)/tools')}
+              onPress={handleNavigateToTools}
               className="bg-secondary-100 dark:bg-secondary-900/30 rounded-xl px-4 py-3 flex-row items-center gap-2"
               accessibilityRole="button"
               accessibilityLabel="Recovery Tools"
@@ -296,7 +333,7 @@ export default function DashboardScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => router.push('/report')}
+              onPress={handleNavigateToReport}
               className="bg-amber-100 dark:bg-amber-900/30 rounded-xl px-4 py-3 flex-row items-center gap-2"
               accessibilityRole="button"
               accessibilityLabel="Weekly Report"

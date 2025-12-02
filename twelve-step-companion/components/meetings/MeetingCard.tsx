@@ -1,9 +1,10 @@
 /**
  * MeetingCard Component
  * Display card for regular meetings
+ * Memoized for FlatList performance
  */
 
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Card } from '../ui';
@@ -54,7 +55,7 @@ function getTypeLabel(type: RegularMeetingType): string {
   }
 }
 
-export function MeetingCard({
+function MeetingCardComponent({
   meeting,
   onToggleReminder,
   showDaysUntil = false,
@@ -64,16 +65,16 @@ export function MeetingCard({
 }: MeetingCardProps) {
   const router = useRouter();
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     router.push(`/my-meetings/${meeting.id}`);
-  };
+  }, [router, meeting.id]);
 
-  const getDaysUntilText = () => {
+  const getDaysUntilText = useCallback(() => {
     if (daysUntil === undefined) return null;
     if (daysUntil === 0) return 'Today';
     if (daysUntil === 1) return 'Tomorrow';
     return `In ${daysUntil} days`;
-  };
+  }, [daysUntil]);
 
   if (compact) {
     return (
@@ -208,4 +209,16 @@ export function MeetingCard({
     </TouchableOpacity>
   );
 }
+
+// Memoize to prevent unnecessary re-renders in FlatList
+export const MeetingCard = memo(MeetingCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.meeting.id === nextProps.meeting.id &&
+    prevProps.meeting.name === nextProps.meeting.name &&
+    prevProps.meeting.reminderEnabled === nextProps.meeting.reminderEnabled &&
+    prevProps.daysUntil === nextProps.daysUntil &&
+    prevProps.showDaysUntil === nextProps.showDaysUntil &&
+    prevProps.compact === nextProps.compact
+  );
+});
 

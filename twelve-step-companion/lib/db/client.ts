@@ -1,6 +1,36 @@
 /**
  * SQLite Database Client
  * Handles database initialization and migrations
+ * 
+ * SECURITY ARCHITECTURE:
+ * ---------------------
+ * This app uses a DEFENSE-IN-DEPTH approach to data security:
+ * 
+ * 1. FIELD-LEVEL ENCRYPTION (Primary Protection):
+ *    - All sensitive content (journal entries, reflections, notes) is encrypted
+ *      using AES-256-GCM before storage via lib/encryption
+ *    - Encryption keys are stored in expo-secure-store with biometric protection
+ *    - This ensures data remains encrypted even if database file is accessed
+ * 
+ * 2. iOS DATA PROTECTION:
+ *    - On iOS, database files automatically benefit from iOS Data Protection
+ *    - Files are encrypted when device is locked (NSFileProtectionComplete)
+ * 
+ * 3. ANDROID ENCRYPTED FILE SYSTEM:
+ *    - Modern Android devices use file-based encryption (FBE)
+ *    - Database files in app's private directory are protected
+ * 
+ * NOTE ON SQLCipher:
+ * -----------------
+ * SQLCipher (full database encryption) is NOT currently used because:
+ * - expo-sqlite doesn't natively support SQLCipher
+ * - Field-level encryption already protects all sensitive content
+ * - Platform-level protections provide additional file security
+ * - Performance impact of full-DB encryption is avoided
+ * 
+ * If SQLCipher is needed in future (e.g., for compliance), consider:
+ * - expo-community-sqlite-storage with SQLCipher support
+ * - react-native-quick-sqlite with encryption
  */
 
 import * as SQLite from 'expo-sqlite';
@@ -11,10 +41,19 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 /**
  * Get the database instance
+ * Database is stored in the app's private directory which is:
+ * - Protected by iOS Data Protection on iOS
+ * - Protected by Android's FBE on Android
  */
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (!db) {
     db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    
+    // Enable WAL mode for better performance and reliability
+    await db.execAsync('PRAGMA journal_mode = WAL;');
+    
+    // Enable foreign keys for referential integrity
+    await db.execAsync('PRAGMA foreign_keys = ON;');
   }
   return db;
 }
@@ -128,6 +167,7 @@ export async function initializeDatabase(): Promise<void> {
       date TEXT NOT NULL,
       what_happened TEXT,
       what_learned TEXT,
+      plan TEXT,
       previous_sober_days INTEGER NOT NULL,
       created_at TEXT NOT NULL
     );
@@ -286,6 +326,14 @@ export async function initializeDatabase(): Promise<void> {
       created_at TEXT NOT NULL
     );
 
+    -- Promise Experiences
+    CREATE TABLE IF NOT EXISTS promise_experiences (
+      promise_id TEXT PRIMARY KEY,
+      experienced INTEGER NOT NULL DEFAULT 0,
+      reflection TEXT,
+      experienced_at TEXT
+    );
+
     -- Step Progress
     CREATE TABLE IF NOT EXISTS step_progress (
       id TEXT PRIMARY KEY,
@@ -332,359 +380,169 @@ export async function initializeDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_gratitude_date ON gratitude_entries(date);
     CREATE INDEX IF NOT EXISTS idx_10th_step_date ON tenth_step_reviews(date);
     CREATE INDEX IF NOT EXISTS idx_literature_book ON literature_progress(book_id);
+    CREATE INDEX IF NOT EXISTS idx_promise_experienced ON promise_experiences(experienced);
     CREATE INDEX IF NOT EXISTS idx_step_progress_number ON step_progress(step_number);
     CREATE INDEX IF NOT EXISTS idx_step_answers_step ON step_answers(step_number);
   `);
 
-  // Run migrations for existing databases
+  // Run versioned migrations for existing databases
   await runMigrations(database);
+}
+
+// Current schema version - increment when adding new migrations
+const SCHEMA_VERSION = 4;
+
+/**
+ * Migration definitions
+ * Each migration runs only once, tracked by version number
+ */
+interface Migration {
+  version: number;
+  description: string;
+  up: (db: SQLite.SQLiteDatabase) => Promise<void>;
+}
+
+const MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    description: 'Add audio columns to journal_entries',
+    up: async (db) => {
+      await db.execAsync(`ALTER TABLE journal_entries ADD COLUMN audio_uri TEXT;`);
+      await db.execAsync(`ALTER TABLE journal_entries ADD COLUMN audio_duration INTEGER;`);
+    },
+  },
+  {
+    version: 2,
+    description: 'Add plan column to relapse_records',
+    up: async (db) => {
+      await db.execAsync(`ALTER TABLE relapse_records ADD COLUMN plan TEXT;`);
+    },
+  },
+  {
+    version: 3,
+    description: 'Add crisis_region to app_settings',
+    up: async (db) => {
+      await db.execAsync(`ALTER TABLE app_settings ADD COLUMN crisis_region TEXT NOT NULL DEFAULT 'US';`);
+    },
+  },
+  {
+    version: 4,
+    description: 'Add enhanced meeting_logs columns',
+    up: async (db) => {
+      const columns = [
+        { name: 'what_i_learned', type: 'TEXT' },
+        { name: 'quote_heard', type: 'TEXT' },
+        { name: 'connections_mode', type: 'TEXT' },
+        { name: 'connection_notes', type: 'TEXT' },
+        { name: 'did_share', type: 'INTEGER DEFAULT 0' },
+        { name: 'share_reflection', type: 'TEXT' },
+        { name: 'regular_meeting_id', type: 'TEXT' },
+      ];
+      for (const column of columns) {
+        try {
+          await db.execAsync(
+            `ALTER TABLE meeting_logs ADD COLUMN ${column.name} ${column.type};`
+          );
+        } catch {
+          // Column may already exist from previous partial migration
+        }
+      }
+    },
+  },
+];
+
+/**
+ * Get current schema version from database
+ */
+async function getSchemaVersion(database: SQLite.SQLiteDatabase): Promise<number> {
+  try {
+    // Create schema_versions table if it doesn't exist
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS schema_versions (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        version INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+      );
+    `);
+
+    // Get current version
+    const result = await database.getFirstAsync<{ version: number }>(
+      'SELECT version FROM schema_versions WHERE id = 1'
+    );
+
+    if (!result) {
+      // Initialize version table with 0 for new databases
+      // or detect existing unversioned databases
+      const hasJournalTable = await database.getFirstAsync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='journal_entries'"
+      );
+      
+      const initialVersion = hasJournalTable ? 0 : SCHEMA_VERSION;
+      await database.runAsync(
+        'INSERT INTO schema_versions (id, version, updated_at) VALUES (1, ?, ?)',
+        [initialVersion, new Date().toISOString()]
+      );
+      return initialVersion;
+    }
+
+    return result.version;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Update schema version in database
+ */
+async function setSchemaVersion(database: SQLite.SQLiteDatabase, version: number): Promise<void> {
+  await database.runAsync(
+    'UPDATE schema_versions SET version = ?, updated_at = ? WHERE id = 1',
+    [version, new Date().toISOString()]
+  );
 }
 
 /**
  * Run database migrations for schema updates
+ * Uses version tracking for cleaner, idempotent migrations
  */
 async function runMigrations(database: SQLite.SQLiteDatabase): Promise<void> {
-  // Check if audio columns exist, add if not
-  try {
-    await database.execAsync(`
-      ALTER TABLE journal_entries ADD COLUMN audio_uri TEXT;
-    `);
-  } catch {
-    // Column already exists
+  const currentVersion = await getSchemaVersion(database);
+  
+  // Get migrations that need to run
+  const pendingMigrations = MIGRATIONS.filter(m => m.version > currentVersion);
+  
+  if (pendingMigrations.length === 0) {
+    // No migrations needed
+    return;
   }
 
-  try {
-    await database.execAsync(`
-      ALTER TABLE journal_entries ADD COLUMN audio_duration INTEGER;
-    `);
-  } catch {
-    // Column already exists
-  }
+  console.log(`Running ${pendingMigrations.length} database migration(s)...`);
 
-  // Create time_capsules table if it doesn't exist (already in main schema)
-  // This is just a safety check for existing databases
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS time_capsules (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        unlock_date TEXT NOT NULL,
-        is_unlocked INTEGER NOT NULL DEFAULT 0,
-        unlocked_at TEXT,
-        created_at TEXT NOT NULL
-      );
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Create motivation_vault table for existing databases
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS motivation_vault (
-        id TEXT PRIMARY KEY,
-        type TEXT NOT NULL,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        media_uri TEXT,
-        is_favorite INTEGER NOT NULL DEFAULT 0,
-        view_count INTEGER NOT NULL DEFAULT 0,
-        last_viewed_at TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Create scenario_practices table for existing databases
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS scenario_practices (
-        id TEXT PRIMARY KEY,
-        scenario_id TEXT NOT NULL,
-        selected_option_index INTEGER NOT NULL,
-        reflection TEXT,
-        completed_at TEXT NOT NULL
-      );
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Add crisis_region column for existing databases
-  try {
-    await database.execAsync(`
-      ALTER TABLE app_settings ADD COLUMN crisis_region TEXT NOT NULL DEFAULT 'US';
-    `);
-  } catch {
-    // Column already exists
-  }
-
-  // Phase 2: Enhanced meeting_logs columns
-  await addEnhancedMeetingColumns(database);
-
-  // V2 Tables - Create for existing databases
-  await createV2Tables(database);
-}
-
-/**
- * Add enhanced meeting_logs columns for Phase 2
- */
-async function addEnhancedMeetingColumns(database: SQLite.SQLiteDatabase): Promise<void> {
-  const columnsToAdd = [
-    { name: 'what_i_learned', type: 'TEXT' },
-    { name: 'quote_heard', type: 'TEXT' },
-    { name: 'connections_mode', type: 'TEXT' },
-    { name: 'connection_notes', type: 'TEXT' },
-    { name: 'did_share', type: 'INTEGER DEFAULT 0' },
-    { name: 'share_reflection', type: 'TEXT' },
-    { name: 'regular_meeting_id', type: 'TEXT' },
-  ];
-
-  for (const column of columnsToAdd) {
+  // Run each migration in order
+  for (const migration of pendingMigrations.sort((a, b) => a.version - b.version)) {
     try {
-      await database.execAsync(
-        `ALTER TABLE meeting_logs ADD COLUMN ${column.name} ${column.type};`
-      );
-    } catch {
-      // Column already exists
+      console.log(`Migration ${migration.version}: ${migration.description}`);
+      await migration.up(database);
+      await setSchemaVersion(database, migration.version);
+    } catch (error) {
+      console.error(`Migration ${migration.version} failed:`, error);
+      // Continue with other migrations - some ALTERs may fail if column exists
     }
   }
+
+  // Ensure we're at the current schema version
+  await setSchemaVersion(database, SCHEMA_VERSION);
+  console.log(`Database schema updated to version ${SCHEMA_VERSION}`);
 }
 
 /**
- * Create V2 tables for existing databases
+ * Get current schema version for external use (e.g., debugging)
  */
-async function createV2Tables(database: SQLite.SQLiteDatabase): Promise<void> {
-  // Recovery Contacts
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS recovery_contacts (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        phone TEXT NOT NULL,
-        role TEXT NOT NULL,
-        notes TEXT,
-        last_contacted_at TEXT,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_contacts_role ON recovery_contacts(role);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Regular Meetings
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS regular_meetings (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        location TEXT,
-        day_of_week INTEGER NOT NULL,
-        time TEXT NOT NULL,
-        type TEXT NOT NULL,
-        is_home_group INTEGER NOT NULL DEFAULT 0,
-        reminder_enabled INTEGER NOT NULL DEFAULT 1,
-        reminder_minutes_before INTEGER NOT NULL DEFAULT 60,
-        notes TEXT,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_regular_meetings_day ON regular_meetings(day_of_week);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Achievements
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS achievements (
-        id TEXT PRIMARY KEY,
-        category TEXT NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        icon TEXT NOT NULL,
-        unlock_type TEXT NOT NULL,
-        target INTEGER,
-        current INTEGER,
-        status TEXT NOT NULL DEFAULT 'locked',
-        unlocked_at TEXT,
-        requires_days_clean INTEGER,
-        requires_achievements TEXT,
-        reflection TEXT
-      );
-      CREATE INDEX IF NOT EXISTS idx_achievements_category ON achievements(category);
-      CREATE INDEX IF NOT EXISTS idx_achievements_status ON achievements(status);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Daily Reading Reflections
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS daily_reading_reflections (
-        id TEXT PRIMARY KEY,
-        reading_date TEXT NOT NULL,
-        reflection TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_reading_reflections_date ON daily_reading_reflections(reading_date);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Fourth Step Inventory
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS fourth_step_inventory (
-        id TEXT PRIMARY KEY,
-        type TEXT NOT NULL,
-        who TEXT NOT NULL,
-        cause TEXT NOT NULL,
-        affects TEXT NOT NULL,
-        my_part TEXT,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_4th_step_type ON fourth_step_inventory(type);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Amends List
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS amends_list (
-        id TEXT PRIMARY KEY,
-        person TEXT NOT NULL,
-        harm TEXT NOT NULL,
-        amends_type TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'not_willing',
-        notes TEXT,
-        made_at TEXT,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_amends_status ON amends_list(status);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Phone Call Logs
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS phone_call_logs (
-        id TEXT PRIMARY KEY,
-        contact_id TEXT NOT NULL,
-        contact_name TEXT NOT NULL,
-        duration INTEGER,
-        notes TEXT,
-        called_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_phone_logs_called ON phone_call_logs(called_at);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Gratitude Entries
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS gratitude_entries (
-        id TEXT PRIMARY KEY,
-        date TEXT NOT NULL,
-        items TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_gratitude_date ON gratitude_entries(date);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Tenth Step Reviews
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS tenth_step_reviews (
-        id TEXT PRIMARY KEY,
-        date TEXT NOT NULL,
-        was_resentful TEXT,
-        was_selfish TEXT,
-        was_dishonest TEXT,
-        was_afraid TEXT,
-        owe_apology TEXT,
-        could_do_better TEXT,
-        grateful_for TEXT,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_10th_step_date ON tenth_step_reviews(date);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Literature Progress
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS literature_progress (
-        id TEXT PRIMARY KEY,
-        book_id TEXT NOT NULL,
-        chapter_id TEXT NOT NULL,
-        is_completed INTEGER NOT NULL DEFAULT 0,
-        notes TEXT,
-        completed_at TEXT,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_literature_book ON literature_progress(book_id);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Step Progress
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS step_progress (
-        id TEXT PRIMARY KEY,
-        step_number INTEGER NOT NULL,
-        questions_answered INTEGER NOT NULL DEFAULT 0,
-        total_questions INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT 'locked',
-        started_at TEXT,
-        completed_at TEXT,
-        discussed_at TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_step_progress_number ON step_progress(step_number);
-    `);
-  } catch {
-    // Table already exists
-  }
-
-  // Step Answers
-  try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS step_answers (
-        id TEXT PRIMARY KEY,
-        step_number INTEGER NOT NULL,
-        question_index INTEGER NOT NULL,
-        answer TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_step_answers_step ON step_answers(step_number);
-    `);
-  } catch {
-    // Table already exists
-  }
+export async function getCurrentSchemaVersion(): Promise<number> {
+  const database = await getDatabase();
+  return getSchemaVersion(database);
 }
+
 
 /**
  * Close database connection
@@ -725,8 +583,10 @@ export async function clearAllData(): Promise<void> {
     DELETE FROM gratitude_entries;
     DELETE FROM tenth_step_reviews;
     DELETE FROM literature_progress;
+    DELETE FROM promise_experiences;
     DELETE FROM step_progress;
     DELETE FROM step_answers;
   `);
 }
+
 

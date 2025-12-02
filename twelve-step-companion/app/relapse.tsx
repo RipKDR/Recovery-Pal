@@ -21,6 +21,7 @@ import { Card, Button, Slider } from '../components/ui';
 import { useSobriety } from '../lib/hooks/useSobriety';
 import { useProfileStore } from '../lib/store';
 import { getDatabase } from '../lib/db/client';
+import { encryptContent } from '../lib/encryption';
 
 type RelapseStep = 'intro' | 'what-happened' | 'what-learned' | 'plan' | 'complete';
 
@@ -95,11 +96,22 @@ export default function RelapseScreen() {
       const now = new Date().toISOString();
       const id = `relapse_${Date.now()}`;
 
-      // Log the relapse record
+      // Encrypt sensitive fields before storage
+      const encryptedWhatHappened = whatHappened 
+        ? await encryptContent(whatHappened) 
+        : null;
+      const encryptedWhatLearned = whatLearned 
+        ? await encryptContent(whatLearned) 
+        : null;
+      const encryptedPlan = plan 
+        ? await encryptContent(plan) 
+        : null;
+
+      // Log the relapse record with plan
       await db.runAsync(
-        `INSERT INTO relapse_records (id, date, what_happened, what_learned, previous_sober_days, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [id, now, whatHappened || null, whatLearned || null, soberDays, now]
+        `INSERT INTO relapse_records (id, date, what_happened, what_learned, plan, previous_sober_days, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, now, encryptedWhatHappened, encryptedWhatLearned, encryptedPlan, soberDays, now]
       );
 
       // Reset sobriety date to today

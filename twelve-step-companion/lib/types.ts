@@ -143,6 +143,7 @@ export interface RelapseRecord {
   date: Date;
   whatHappened?: EncryptedString;
   whatLearned?: EncryptedString;
+  plan?: EncryptedString; // Recovery plan for moving forward
   previousSoberDays: number;
   createdAt: Date;
 }

@@ -96,6 +96,50 @@ const tools: ToolItem[] = [
   },
 ];
 
+// Literature & Resources tools (Phase 5)
+const literatureTools: ToolItem[] = [
+  {
+    id: 'prayers',
+    title: 'Prayer Library',
+    description: 'Recovery prayers for every situation',
+    emoji: '🙏',
+    route: '/prayers',
+    priority: 'secondary',
+  },
+  {
+    id: 'readings',
+    title: 'Readings Library',
+    description: 'Common recovery readings',
+    emoji: '📖',
+    route: '/readings',
+    priority: 'secondary',
+  },
+  {
+    id: 'slogans',
+    title: 'Slogans',
+    description: 'Recovery slogans explained',
+    emoji: '💬',
+    route: '/slogans',
+    priority: 'secondary',
+  },
+  {
+    id: 'promises',
+    title: 'The Promises',
+    description: 'Track your spiritual growth',
+    emoji: '✨',
+    route: '/promises',
+    priority: 'secondary',
+  },
+  {
+    id: 'literature',
+    title: 'Literature Progress',
+    description: 'Track your reading journey',
+    emoji: '📚',
+    route: '/literature',
+    priority: 'secondary',
+  },
+];
+
 function ToolCard({ tool, onPress }: { tool: ToolItem; onPress: () => void }) {
   const isPrimary = tool.priority === 'primary';
   
@@ -180,6 +224,7 @@ export default function ToolsScreen() {
   
   // Collapsible section states - Primary always expanded, others collapsed by default
   const [secondaryExpanded, setSecondaryExpanded] = useState(false);
+  const [literatureExpanded, setLiteratureExpanded] = useState(false);
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
 
   const handleToolPress = (tool: ToolItem) => {
@@ -188,10 +233,12 @@ export default function ToolsScreen() {
     }
   };
 
-  const toggleSection = (section: 'secondary' | 'advanced') => {
+  const toggleSection = (section: 'secondary' | 'literature' | 'advanced') => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (section === 'secondary') {
       setSecondaryExpanded(!secondaryExpanded);
+    } else if (section === 'literature') {
+      setLiteratureExpanded(!literatureExpanded);
     } else {
       setAdvancedExpanded(!advancedExpanded);
     }
@@ -273,6 +320,25 @@ export default function ToolsScreen() {
         >
           <View className="flex-row flex-wrap justify-between">
             {secondaryTools.map((tool) => (
+              <ToolCard
+                key={tool.id}
+                tool={tool}
+                onPress={() => handleToolPress(tool)}
+              />
+            ))}
+          </View>
+        </CollapsibleSection>
+
+        {/* Literature & Resources Section - Collapsible */}
+        <CollapsibleSection
+          title="Literature & Resources"
+          emoji="📚"
+          isExpanded={literatureExpanded}
+          onToggle={() => toggleSection('literature')}
+          itemCount={literatureTools.length}
+        >
+          <View className="flex-row flex-wrap justify-between">
+            {literatureTools.map((tool) => (
               <ToolCard
                 key={tool.id}
                 tool={tool}

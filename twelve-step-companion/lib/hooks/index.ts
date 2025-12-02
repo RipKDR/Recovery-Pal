@@ -16,3 +16,6 @@ export { usePhoneCalls } from './usePhoneCalls';
 export { useReading } from './useReading';
 export { useRegularMeetings } from './useRegularMeetings';
 
+// Phase 4 Hooks
+export { useAchievements } from './useAchievements';
+

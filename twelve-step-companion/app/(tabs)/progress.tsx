@@ -3,14 +3,16 @@
  * Milestones, achievements, and recovery statistics
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { SobrietyCounter, MilestoneCard, SimpleTrendChart } from '../../components/progress';
+import { FeaturedKeytag, UnlockCelebrationModal } from '../../components/achievements';
 import { Card } from '../../components/ui';
 import { useSobriety } from '../../lib/hooks/useSobriety';
 import { useCheckin } from '../../lib/hooks/useCheckin';
+import { useAchievements } from '../../lib/hooks/useAchievements';
 
 export default function ProgressScreen() {
   const router = useRouter();
@@ -35,6 +37,28 @@ export default function ProgressScreen() {
     cravingTrend,
     history,
   } = useCheckin();
+
+  const {
+    keytags,
+    earnedKeytagsList,
+    nextKeytag,
+    totalUnlocked,
+    totalAchievements,
+    overallProgress,
+    recentUnlock,
+    dismissRecentUnlock,
+    checkAchievements,
+  } = useAchievements();
+
+  // Check for new achievements when stats change
+  useEffect(() => {
+    checkAchievements();
+  }, [soberDays, checkinStreak, checkAchievements]);
+
+  // Get current keytag (most recently earned)
+  const currentKeytag = earnedKeytagsList.length > 0
+    ? earnedKeytagsList[earnedKeytagsList.length - 1]
+    : null;
 
   // Calculate "progress not perfection" metrics
   const totalCheckins = history.filter((c) => c.isCheckedIn).length;
@@ -145,6 +169,43 @@ export default function ProgressScreen() {
           />
         </View>
 
+        {/* Keytags & Achievements Section */}
+        <View className="mb-6">
+          <View className="flex-row justify-between items-center mb-3">
+            <Text className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+              Achievements
+            </Text>
+            <TouchableOpacity onPress={() => router.push('/achievements')}>
+              <Text className="text-primary-600 text-sm">View All →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Current Keytag */}
+          {currentKeytag && (
+            <FeaturedKeytag
+              current={currentKeytag}
+              next={nextKeytag}
+              onPress={() => router.push('/achievements')}
+            />
+          )}
+
+          {/* Quick Achievement Stats */}
+          <View className="flex-row gap-3 mt-3">
+            <Card variant="default" className="flex-1">
+              <Text className="text-2xl font-bold text-secondary-600">
+                {totalUnlocked}
+              </Text>
+              <Text className="text-sm text-surface-500">Achievements</Text>
+            </Card>
+            <Card variant="default" className="flex-1">
+              <Text className="text-2xl font-bold text-primary-600">
+                {overallProgress}%
+              </Text>
+              <Text className="text-sm text-surface-500">Progress</Text>
+            </Card>
+          </View>
+        </View>
+
         {/* Next Milestone */}
         {nextMilestone && (
           <View className="mb-6">
@@ -224,6 +285,13 @@ export default function ProgressScreen() {
         {/* Bottom spacing */}
         <View className="h-6" />
       </ScrollView>
+
+      {/* Achievement Unlock Celebration */}
+      <UnlockCelebrationModal
+        achievement={recentUnlock}
+        visible={!!recentUnlock}
+        onClose={dismissRecentUnlock}
+      />
     </SafeAreaView>
   );
 }

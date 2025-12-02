@@ -25,3 +25,6 @@ export { useFourthStepStore } from './fourthStepStore';
 export { useAmendsStore } from './amendsStore';
 export { useTenthStepStore } from './tenthStepStore';
 
+// Phase 4 Stores
+export { useAchievementStore } from './achievementStore';
+

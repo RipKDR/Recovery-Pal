@@ -2,13 +2,15 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "module": "ESNext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "customConditions": ["expo"]
   },
   "include": [
     "**/*.ts",

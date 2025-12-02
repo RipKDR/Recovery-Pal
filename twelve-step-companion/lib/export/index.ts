@@ -292,7 +292,10 @@ export async function exportAllData(): Promise<string> {
     journalEntries,
     dailyCheckins,
     milestones,
-    meetingLogs,
+    meetingLogs: meetingLogs.map(log => ({
+      ...log,
+      didShare: false,
+    })),
     vaultItems,
     timeCapsules,
     scenarioPractices,

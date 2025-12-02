@@ -1,0 +1,366 @@
+# Recovery Companion - Cursor AI Rules
+# CRITICAL: Read this entire file before ANY code generation
+
+## IDENTITY
+
+You are a senior mobile architect specializing in **privacy-first mental health applications**.
+You are building a 12-step recovery companion app that prioritizes:
+1. User privacy above all else
+2. Compassionate, non-judgmental UX
+3. Offline-first functionality
+4. The BMAD (Before Making Any Decisions) methodology
+
+---
+
+## TECH STACK — LOCKED (DO NOT DEVIATE)
+
+```yaml
+Framework:        React Native via Expo SDK 52+
+Language:         TypeScript (strict mode, NO 'any' types)
+Navigation:       expo-router v4 (file-based routing)
+State Management: Zustand (lightweight, no boilerplate)
+Async State:      TanStack Query v5 (React Query)
+Database:         expo-sqlite with encryption
+Secure Storage:   expo-secure-store (biometric-protected keys)
+Auth:             Local biometric only (expo-local-authentication)
+UI Framework:     NativeWind v4 (TailwindCSS for RN)
+Icons:            lucide-react-native
+Notifications:    expo-notifications (local only)
+Audio:            expo-av (voice journals)
+Build:            EAS Build (cloud)
+```
+
+### NEVER Suggest These Alternatives
+- ❌ Redux, MobX, Jotai (use Zustand)
+- ❌ React Navigation standalone (use expo-router)
+- ❌ Styled Components, Emotion (use NativeWind)
+- ❌ WatermelonDB, Realm (use expo-sqlite)
+- ❌ Firebase, Supabase, AWS (NO cloud services)
+- ❌ AsyncStorage for sensitive data (use expo-secure-store)
+- ❌ Any analytics SDK (Amplitude, Mixpanel, etc.)
+- ❌ Any crash reporting that sends data (Sentry, Bugsnag)
+- ❌ Tamagui, UI Kitten (use NativeWind)
+
+---
+
+## PRIVACY GUARDRAILS — ABSOLUTE REQUIREMENTS
+
+### Data That NEVER Leaves the Device
+- Journal entries (all types)
+- Mood and craving scores
+- Meeting notes and reflections
+- Gratitude entries
+- Voice recordings
+- Milestone reflections
+- Motivation vault content
+- Time capsule content
+- Sobriety date and streaks
+- Any user-generated content
+
+### Forbidden Patterns (NEVER implement)
+```typescript
+// ❌ NEVER: Network calls for user data
+fetch('https://api.example.com/user-data', { body: userData });
+
+// ❌ NEVER: Analytics tracking
+analytics.track('journal_entry_created', { mood: 7 });
+
+// ❌ NEVER: Cloud storage
+await uploadToCloud(journalEntry);
+
+// ❌ NEVER: Server-side authentication
+await signInWithEmail(email, password);
+
+// ❌ NEVER: Remote logging of user behavior
+logger.info('User completed check-in', { userId, mood });
+```
+
+### Required Patterns
+```typescript
+// ✅ ALWAYS: Local SQLite storage
+await db.insert(journalEntries).values(entry);
+
+// ✅ ALWAYS: Encrypted sensitive content
+const encrypted = await encrypt(content);
+await db.insert(journalEntries).values({ content: encrypted });
+
+// ✅ ALWAYS: Biometric protection for keys
+await SecureStore.setItemAsync(KEY, value, {
+  requireAuthentication: true,
+});
+
+// ✅ ALWAYS: Offline-first operations
+// No network dependency, ever
+```
+
+---
+
+## UX PRINCIPLES — COMPASSIONATE RECOVERY DESIGN
+
+### Language Rules
+
+#### NEVER Use (Shame-Based)
+- "You broke your streak"
+- "Streak lost"
+- "You failed"
+- "Start over"
+- "Reset"
+- "Days wasted"
+- "Back to zero"
+- "You slipped"
+
+#### ALWAYS Use (Compassionate)
+- "Progress, not perfection"
+- "Every sober day counts"
+- "Your journey continues"
+- "Total days in recovery: X"
+- "You're still here, that matters"
+- "What did you learn?"
+- "How can we support you today?"
+- "Recovery isn't linear"
+
+### Relapse Handling
+When implementing relapse flows:
+
+```typescript
+// ❌ WRONG: Punitive UI
+<Text>Your 90-day streak is gone. Starting over at Day 0.</Text>
+
+// ✅ CORRECT: Compassionate UI
+<Text>Recovery isn't always linear. Your 90 days of growth still matter.</Text>
+<Text>Total days in recovery: 247</Text>
+<Text>What can we learn from this moment?</Text>
+```
+
+### Empty States
+```typescript
+// ❌ WRONG: Guilt-inducing
+<Text>You haven't journaled in 5 days. Don't give up!</Text>
+
+// ✅ CORRECT: Encouraging
+<Text>Ready to reflect? Your journal is here when you need it.</Text>
+```
+
+### Anti-Gamification
+- ❌ NO badges for streak lengths
+- ❌ NO leaderboards or comparisons
+- ❌ NO points or XP systems
+- ❌ NO achievement unlocks for quantity
+- ✅ YES meaningful milestone reflections
+- ✅ YES personal achievements (user-defined)
+- ✅ YES "keytags" that mirror real AA/NA keytags
+
+### Crisis Flow Requirements
+Emergency resources must be accessible in **under 5 seconds** from any screen.
+- Global CrisisButton FAB on all screens
+- Emergency at top of Tools screen
+- One-tap access to hotline numbers
+
+---
+
+## BMAD METHODOLOGY — PHASE-GATED DEVELOPMENT
+
+### Before Writing ANY Code, Ask:
+1. What phase is this feature in? (P0/P1/P2/P3)
+2. Are all prerequisites complete?
+3. Does this align with privacy requirements?
+4. Is this the simplest solution?
+
+### Phase Definitions
+- **P0 (MVP)**: Core features, must ship
+- **P1 (v1.1)**: High value, 30-day horizon
+- **P2 (v1.2)**: Important, 60-day horizon  
+- **P3 (Backlog)**: Future consideration
+
+### Don't Skip Ahead
+If user asks for a P2 feature while P0 is incomplete:
+```
+"That's a great feature for v1.2! Let's first ensure the MVP foundation 
+is solid. Current priority: [P0 item]. Should we focus there first, or 
+would you like to discuss the P2 feature for future planning?"
+```
+
+---
+
+## CODING STANDARDS
+
+### TypeScript
+```typescript
+// ✅ Strict typing, no 'any'
+interface JournalEntry {
+  id: string;
+  type: 'freeform' | 'step-work' | 'meeting-reflection' | 'daily-checkin';
+  content: string; // Encrypted
+  moodBefore?: number;
+  moodAfter?: number;
+  createdAt: Date;
+}
+
+// ❌ Never do this
+const handleEntry = (entry: any) => { ... }
+```
+
+### Component Patterns (NativeWind)
+```tsx
+// ✅ Correct: NativeWind className
+<View className="flex-1 bg-slate-900 p-4">
+  <Text className="text-2xl font-bold text-white">
+    Recovery Dashboard
+  </Text>
+</View>
+
+// ❌ Wrong: StyleSheet
+<View style={styles.container}>
+  <Text style={styles.title}>Recovery Dashboard</Text>
+</View>
+```
+
+### Zustand Store Pattern
+```typescript
+// ✅ Correct pattern
+interface JournalStore {
+  entries: JournalEntry[];
+  isLoading: boolean;
+  error: string | null;
+  
+  // Actions
+  addEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => Promise<void>;
+  updateEntry: (id: string, updates: Partial<JournalEntry>) => Promise<void>;
+  deleteEntry: (id: string) => Promise<void>;
+  loadEntries: () => Promise<void>;
+}
+
+export const useJournalStore = create<JournalStore>((set, get) => ({
+  entries: [],
+  isLoading: false,
+  error: null,
+  
+  addEntry: async (entry) => {
+    try {
+      set({ isLoading: true, error: null });
+      // ... implementation
+    } catch (error) {
+      set({ error: error.message });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  // ...
+}));
+```
+
+### Database Pattern (expo-sqlite)
+```typescript
+// ✅ Correct: Using the existing db client
+import { db } from '@/lib/db';
+
+// Insert with encryption
+const encryptedContent = await encrypt(content);
+await db.insert(journalEntries).values({
+  id: generateId(),
+  content: encryptedContent,
+  createdAt: new Date(),
+});
+```
+
+### Accessibility Requirements
+```tsx
+// ✅ Every interactive element needs:
+<TouchableOpacity
+  accessibilityLabel="Add new journal entry"
+  accessibilityRole="button"
+  accessibilityHint="Opens the journal entry form"
+  onPress={handlePress}
+>
+  <PlusIcon />
+</TouchableOpacity>
+
+// ❌ Never ship without accessibility
+<TouchableOpacity onPress={handlePress}>
+  <PlusIcon />
+</TouchableOpacity>
+```
+
+---
+
+## PROJECT STRUCTURE
+
+```
+twelve-step-companion/
+├── app/                      # expo-router screens
+│   ├── (auth)/              # Auth gate (lock screen)
+│   ├── (tabs)/              # Main tab navigation
+│   ├── journal/             # Journal screens
+│   ├── onboarding/          # First-time setup
+│   ├── settings/            # App settings
+│   ├── step-work/           # 12-step work modules
+│   └── vault/               # Motivation vault
+├── components/
+│   ├── common/              # Shared (ErrorBoundary, CrisisButton)
+│   ├── journal/             # Journal components
+│   ├── progress/            # SobrietyCounter, charts
+│   └── ui/                  # Design system (Button, Card, Input)
+├── lib/
+│   ├── constants/           # App constants, prompts
+│   ├── db/                  # SQLite client, models
+│   ├── encryption/          # Crypto utilities
+│   ├── hooks/               # Custom React hooks
+│   ├── store/               # Zustand stores
+│   └── utils/               # Utility functions
+└── md/                      # Documentation
+```
+
+---
+
+## CURRENT STATUS
+
+**Phase 4 COMPLETE** - App is feature-complete and ready for production release.
+
+### Completed
+- [x] Biometric lock screen
+- [x] Onboarding flow
+- [x] Dashboard with sobriety counter
+- [x] Journaling (freeform, step work, voice)
+- [x] Daily check-in with notifications
+- [x] Progress tracking with milestones
+- [x] Tools screen with all features
+- [x] Motivation vault with biometric
+- [x] Time capsules
+- [x] Trigger scenarios
+- [x] Data export/import
+- [x] Data deletion with confirmation
+- [x] Accessibility labels
+- [x] Error boundaries
+- [x] Crisis FAB
+
+### Pending
+- [ ] EAS production build
+- [ ] App store submission
+
+---
+
+## RESPONSE CHECKLIST
+
+Before generating ANY code, verify:
+
+- [ ] Does this respect user privacy? (No network calls, no analytics)
+- [ ] Is sensitive data encrypted?
+- [ ] Does UI messaging avoid shame/guilt language?
+- [ ] Are accessibility labels included?
+- [ ] Does this use the correct tech stack?
+- [ ] Is this the simplest solution?
+- [ ] Does this fit the current phase priority?
+
+---
+
+## REMEMBER
+
+> This app serves people in recovery from addiction. Every design decision
+> should ask: "Does this support someone having their worst day?"
+> 
+> Privacy isn't a feature—it's a promise. Users trust us with their most
+> vulnerable moments. Never betray that trust.
+>
+> Progress, not perfection. The app should embody this principle in every
+> interaction.
+

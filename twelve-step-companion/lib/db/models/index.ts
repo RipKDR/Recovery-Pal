@@ -866,3 +866,264 @@ export async function decryptReflection(reflection: DailyReadingReflection): Pro
   return await decryptContent(reflection.reflection);
 }
 
+// ============================================
+// ACHIEVEMENTS (Phase 4)
+// ============================================
+
+import type {
+  Achievement,
+  DbAchievement,
+  AchievementCategory,
+  AchievementStatus,
+} from '../../types';
+import { ALL_ACHIEVEMENTS, type AchievementDefinition } from '../../constants/achievements';
+
+/**
+ * Initialize achievements table with all definitions
+ * Called on first app load or when new achievements are added
+ */
+export async function initializeAchievements(): Promise<void> {
+  const db = await getDatabase();
+  
+  for (const def of ALL_ACHIEVEMENTS) {
+    // Check if achievement already exists
+    const existing = await db.getFirstAsync<DbAchievement>(
+      'SELECT id FROM achievements WHERE id = ?',
+      [def.id]
+    );
+
+    if (!existing) {
+      await db.runAsync(
+        `INSERT INTO achievements (
+          id, category, title, description, icon, unlock_type,
+          target, current, status, unlocked_at,
+          requires_days_clean, requires_achievements, reflection
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          def.id,
+          def.category,
+          def.title,
+          def.description,
+          def.icon,
+          def.unlockType,
+          def.target || null,
+          0,
+          'locked',
+          null,
+          def.requiresDaysClean || null,
+          def.requiresAchievements ? JSON.stringify(def.requiresAchievements) : null,
+          null,
+        ]
+      );
+    }
+  }
+}
+
+/**
+ * Get all achievements with current status
+ */
+export async function getAchievements(): Promise<Achievement[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<DbAchievement>(
+    'SELECT * FROM achievements ORDER BY category, title'
+  );
+
+  return rows.map(mapDbAchievementToAchievement);
+}
+
+/**
+ * Get achievement by ID
+ */
+export async function getAchievementById(id: string): Promise<Achievement | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<DbAchievement>(
+    'SELECT * FROM achievements WHERE id = ?',
+    [id]
+  );
+
+  if (!row) return null;
+  return mapDbAchievementToAchievement(row);
+}
+
+/**
+ * Get achievements by category
+ */
+export async function getAchievementsByCategory(category: AchievementCategory): Promise<Achievement[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<DbAchievement>(
+    'SELECT * FROM achievements WHERE category = ? ORDER BY title',
+    [category]
+  );
+
+  return rows.map(mapDbAchievementToAchievement);
+}
+
+/**
+ * Get unlocked achievements
+ */
+export async function getUnlockedAchievements(): Promise<Achievement[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<DbAchievement>(
+    'SELECT * FROM achievements WHERE status = ? ORDER BY unlocked_at DESC',
+    ['unlocked']
+  );
+
+  return rows.map(mapDbAchievementToAchievement);
+}
+
+/**
+ * Update achievement progress
+ */
+export async function updateAchievementProgress(
+  id: string,
+  current: number,
+  target?: number
+): Promise<Achievement | null> {
+  const db = await getDatabase();
+  
+  // Get current achievement
+  const existing = await getAchievementById(id);
+  if (!existing) return null;
+
+  // Determine new status based on progress
+  let newStatus: AchievementStatus = existing.status;
+  const effectiveTarget = target ?? existing.target ?? 100;
+  
+  if (current >= effectiveTarget && existing.status !== 'unlocked') {
+    newStatus = 'unlocked';
+  } else if (current > 0 && existing.status === 'locked') {
+    newStatus = 'in_progress';
+  } else if (current > 0 && current < effectiveTarget) {
+    newStatus = 'in_progress';
+  }
+
+  const now = newStatus === 'unlocked' ? new Date().toISOString() : existing.unlockedAt?.toISOString() || null;
+
+  await db.runAsync(
+    `UPDATE achievements SET current = ?, status = ?, unlocked_at = ? WHERE id = ?`,
+    [current, newStatus, now, id]
+  );
+
+  return getAchievementById(id);
+}
+
+/**
+ * Unlock an achievement manually (for self-check type)
+ */
+export async function unlockAchievement(id: string): Promise<Achievement | null> {
+  const db = await getDatabase();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE achievements SET status = ?, unlocked_at = ?, current = target WHERE id = ?`,
+    ['unlocked', now, id]
+  );
+
+  return getAchievementById(id);
+}
+
+/**
+ * Set achievement status
+ */
+export async function setAchievementStatus(
+  id: string,
+  status: AchievementStatus
+): Promise<void> {
+  const db = await getDatabase();
+  const now = status === 'unlocked' ? new Date().toISOString() : null;
+
+  await db.runAsync(
+    `UPDATE achievements SET status = ?, unlocked_at = COALESCE(unlocked_at, ?) WHERE id = ?`,
+    [status, now, id]
+  );
+}
+
+/**
+ * Save achievement reflection (encrypted)
+ */
+export async function saveAchievementReflection(
+  id: string,
+  reflection: string
+): Promise<void> {
+  const db = await getDatabase();
+  const encryptedReflection = await encryptContent(reflection);
+
+  await db.runAsync(
+    `UPDATE achievements SET reflection = ? WHERE id = ?`,
+    [encryptedReflection, id]
+  );
+}
+
+/**
+ * Get achievement reflection (decrypted)
+ */
+export async function getAchievementReflection(id: string): Promise<string | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ reflection: string | null }>(
+    'SELECT reflection FROM achievements WHERE id = ?',
+    [id]
+  );
+
+  if (!row?.reflection) return null;
+  return decryptContent(row.reflection);
+}
+
+/**
+ * Get unlocked count by category
+ */
+export async function getUnlockedCountByCategory(category: AchievementCategory): Promise<number> {
+  const db = await getDatabase();
+  const result = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM achievements WHERE category = ? AND status = ?',
+    [category, 'unlocked']
+  );
+
+  return result?.count || 0;
+}
+
+/**
+ * Get total unlocked achievements count
+ */
+export async function getTotalUnlockedCount(): Promise<number> {
+  const db = await getDatabase();
+  const result = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM achievements WHERE status = ?',
+    ['unlocked']
+  );
+
+  return result?.count || 0;
+}
+
+/**
+ * Reset all achievements (for testing or account reset)
+ */
+export async function resetAllAchievements(): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `UPDATE achievements SET status = 'locked', current = 0, unlocked_at = NULL, reflection = NULL`
+  );
+}
+
+/**
+ * Helper to map database row to Achievement type
+ */
+function mapDbAchievementToAchievement(row: DbAchievement): Achievement {
+  return {
+    id: row.id,
+    category: row.category as AchievementCategory,
+    title: row.title,
+    description: row.description,
+    icon: row.icon,
+    unlockType: row.unlock_type as Achievement['unlockType'],
+    target: row.target || undefined,
+    current: row.current || undefined,
+    status: row.status as AchievementStatus,
+    unlockedAt: row.unlocked_at ? new Date(row.unlocked_at) : undefined,
+    requiresDaysClean: row.requires_days_clean || undefined,
+    requiresAchievements: row.requires_achievements
+      ? JSON.parse(row.requires_achievements)
+      : undefined,
+    reflection: row.reflection || undefined,
+  };
+}
+

@@ -1,9 +1,10 @@
 /**
  * ContactCard Component
  * Displays a recovery contact with quick actions
+ * Memoized for FlatList performance
  */
 
-import React, { useState } from 'react';
+import React, { useState, memo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { Card } from '../ui';
 import { QuickCall } from './QuickCall';
@@ -26,7 +27,7 @@ const ROLE_ICONS: Record<ContactRole, string> = {
   fellowship: '🤝',
 };
 
-export function ContactCard({
+function ContactCardComponent({
   contact,
   onCall,
   onText,
@@ -36,7 +37,7 @@ export function ContactCard({
 }: ContactCardProps) {
   const [showMenu, setShowMenu] = useState(false);
 
-  const getDaysSinceContact = (): string => {
+  const getDaysSinceContact = useCallback((): string => {
     if (!contact.lastContactedAt) {
       return 'Not contacted yet';
     }
@@ -51,9 +52,9 @@ export function ContactCard({
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 14) return '1 week ago';
     return `${Math.floor(diffDays / 7)} weeks ago`;
-  };
+  }, [contact.lastContactedAt]);
 
-  const handleLongPress = () => {
+  const handleLongPress = useCallback(() => {
     if (onEdit || onDelete) {
       Alert.alert(
         contact.name,
@@ -67,9 +68,9 @@ export function ContactCard({
         ].filter(Boolean) as any[]
       );
     }
-  };
+  }, [contact.name, onEdit, onDelete]);
 
-  const lastContactColor = () => {
+  const lastContactColor = useCallback(() => {
     if (!contact.lastContactedAt) return 'text-surface-400';
     
     const now = new Date();
@@ -81,7 +82,7 @@ export function ContactCard({
     if (diffDays <= 7) return 'text-green-600 dark:text-green-400';
     if (diffDays <= 14) return 'text-amber-600 dark:text-amber-400';
     return 'text-red-600 dark:text-red-400';
-  };
+  }, [contact.lastContactedAt]);
 
   return (
     <TouchableOpacity
@@ -128,4 +129,15 @@ export function ContactCard({
     </TouchableOpacity>
   );
 }
+
+// Memoize to prevent unnecessary re-renders in FlatList
+export const ContactCard = memo(ContactCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.contact.id === nextProps.contact.id &&
+    prevProps.contact.name === nextProps.contact.name &&
+    prevProps.contact.phone === nextProps.contact.phone &&
+    prevProps.contact.lastContactedAt === nextProps.contact.lastContactedAt &&
+    prevProps.showActions === nextProps.showActions
+  );
+});
 
