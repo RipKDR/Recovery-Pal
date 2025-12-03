@@ -53,7 +53,7 @@
 |------------|---------|---------|
 | NativeWind | v4 | Tailwind CSS for React Native |
 | lucide-react-native | Latest | Icon library |
-| expo-av | Latest | Audio recording/playback |
+| expo-audio | Latest | Audio recording/playback |
 
 ### Security & Auth
 

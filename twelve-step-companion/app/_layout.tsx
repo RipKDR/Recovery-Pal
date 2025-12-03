@@ -54,24 +54,54 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   const initialize = useCallback(async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:56',message:'App initialization started',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'init',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     try {
       setIsRetrying(true);
       setError(null);
       
       // Initialize error tracking first (so we can capture init errors)
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:62',message:'Initializing error tracking',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'init',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       initializeErrorTracking();
       
       // Initialize database
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:65',message:'Initializing database',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'init',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       await initializeDatabase();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:66',message:'Database initialized successfully',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'init',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       
       // Initialize encryption
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:68',message:'Initializing encryption',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'init',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       await initializeEncryptionKey();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:69',message:'Encryption initialized successfully',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'init',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       
       // Load settings
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:71',message:'Loading settings',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'init',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       await loadSettings();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:72',message:'Settings loaded successfully',data:{settingsLoaded:true,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'init',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       
       setIsReady(true);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:73',message:'App initialization completed',data:{isReady:true,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'init',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:75',message:'Initialization error caught',data:{error:err instanceof Error?err.message:String(err),stack:err instanceof Error?err.stack:undefined,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'init',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       console.error('Initialization error:', err);
       captureException(err as Error, {
         component: 'AppInitializer',

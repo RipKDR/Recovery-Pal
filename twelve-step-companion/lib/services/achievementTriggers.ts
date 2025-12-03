@@ -3,7 +3,7 @@
  * Automatically triggers achievement checks when relevant actions occur
  */
 
-import { useAchievementStore } from '../store/achievementStore';
+import { useAchievementStore, type AchievementContext } from '../store/achievementStore';
 import { getSponsor, getRecoveryContacts } from '../db/models';
 import { scheduleAchievementNotification } from '../notifications';
 import type { Achievement } from '../types';
@@ -183,7 +183,7 @@ export function onSobrietyDaysUpdated(soberDays: number): void {
  * Trigger full achievement check (call on app startup or after significant events)
  */
 export async function triggerFullAchievementCheck(
-  context: Parameters<typeof useAchievementStore.getState>['0']['checkAutoAchievements'] extends (ctx: infer C) => unknown ? C : never
+  context: AchievementContext
 ): Promise<Achievement[]> {
   const store = useAchievementStore.getState();
   

@@ -126,11 +126,20 @@ export const useRhythmStore = create<RhythmStore>((set, get) => ({
   error: null,
 
   loadTodayRhythm: async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/store/rhythmStore.ts:128',message:'loadTodayRhythm started',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'store-load',hypothesisId:'H'})}).catch(()=>{});
+    // #endregion
     set({ isLoading: true, error: null });
     try {
       await ensureTablesExist();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/store/rhythmStore.ts:131',message:'Tables ensured',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'store-load',hypothesisId:'H'})}).catch(()=>{});
+      // #endregion
       const db = await getDatabase();
       const today = getTodayDateStr();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/store/rhythmStore.ts:133',message:'Database obtained, querying',data:{today,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'store-load',hypothesisId:'H'})}).catch(()=>{});
+      // #endregion
 
       // Load today's intention
       const intentionRow = await db.getFirstAsync<{
@@ -212,7 +221,13 @@ export const useRhythmStore = create<RhythmStore>((set, get) => ({
         todayInventory,
         isLoading: false,
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/store/rhythmStore.ts:218',message:'loadTodayRhythm completed',data:{hasIntention:!!todayIntention,hasInventory:!!todayInventory,pulseChecksCount:todayPulseChecks.length,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'store-load',hypothesisId:'H'})}).catch(()=>{});
+      // #endregion
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/store/rhythmStore.ts:225',message:'loadTodayRhythm error',data:{error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'store-load',hypothesisId:'H'})}).catch(()=>{});
+      // #endregion
       console.error('Failed to load today\'s rhythm:', error);
       set({ error: 'Failed to load daily rhythm', isLoading: false });
     }

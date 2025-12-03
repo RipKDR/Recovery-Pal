@@ -7,7 +7,7 @@
  */
 
 import { scheduleJitaiNotification } from './notifications';
-import type { JitaiTrigger, JitaiIntervention, JitaiContext } from './types';
+import type { JitaiTrigger, JitaiIntervention, JitaiContext, TriggerPriority } from './types';
 
 /**
  * Define all intervention triggers
@@ -297,12 +297,13 @@ export function evaluateTriggers(context: JitaiContext): JitaiIntervention[] {
   }
   
   // Sort by priority
-  const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+  const priorityOrder: Record<TriggerPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
   interventions.sort((a, b) => {
     const triggerA = JITAI_TRIGGERS.find(t => t.id === a.triggerId);
     const triggerB = JITAI_TRIGGERS.find(t => t.id === b.triggerId);
-    return (priorityOrder[triggerA?.priority || 'low'] || 3) - 
-           (priorityOrder[triggerB?.priority || 'low'] || 3);
+    const priorityA: TriggerPriority = triggerA?.priority || 'low';
+    const priorityB: TriggerPriority = triggerB?.priority || 'low';
+    return priorityOrder[priorityA] - priorityOrder[priorityB];
   });
   
   // Return only the highest priority intervention to avoid overwhelming user

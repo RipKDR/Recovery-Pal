@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Href } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -16,10 +16,8 @@ import { useJournalStore, useRhythmStore } from '../../lib/store';
 import type { PulseContext, TinyInventory } from '../../lib/store/rhythmStore';
 import { STEP_PROMPTS } from '../../lib/constants/stepPrompts';
 
-// Enable LayoutAnimation for Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// Note: LayoutAnimation.configureNext still works but setLayoutAnimationEnabledExperimental
+// is a no-op in New Architecture (which is enabled in this app)
 
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
 
@@ -230,10 +228,19 @@ function MoodSlider({
     success: 'bg-success-500',
   };
   
+  const [containerWidth, setContainerWidth] = useState(300);
+  
   const getValueLabel = () => {
     if (value <= 3) return leftLabel;
     if (value >= 7) return rightLabel;
     return 'Okay';
+  };
+
+  const handleTouch = (locationX: number) => {
+    if (containerWidth > 0) {
+      const newValue = Math.max(1, Math.min(10, Math.round((locationX / containerWidth) * 10)));
+      onChange(newValue);
+    }
   };
 
   return (
@@ -244,7 +251,15 @@ function MoodSlider({
       </View>
       
       {/* Slider track */}
-      <View className="h-8 justify-center">
+      <View 
+        className="h-8 justify-center"
+        onLayout={(e) => {
+          const { width } = e.nativeEvent.layout;
+          if (width > 0) {
+            setContainerWidth(width);
+          }
+        }}
+      >
         <View className="h-2 bg-surface-700/50 rounded-full relative">
           <View 
             className={`h-2 ${colorClasses[color]} rounded-full`}
@@ -258,16 +273,10 @@ function MoodSlider({
           onStartShouldSetResponder={() => true}
           onMoveShouldSetResponder={() => true}
           onResponderGrant={(e) => {
-            const { locationX } = e.nativeEvent;
-            const containerWidth = e.nativeEvent.target ? 300 : 300; // Approximate width
-            const newValue = Math.max(1, Math.min(10, Math.round((locationX / containerWidth) * 10)));
-            onChange(newValue);
+            handleTouch(e.nativeEvent.locationX);
           }}
           onResponderMove={(e) => {
-            const { locationX } = e.nativeEvent;
-            const containerWidth = 300; // Approximate width
-            const newValue = Math.max(1, Math.min(10, Math.round((locationX / containerWidth) * 10)));
-            onChange(newValue);
+            handleTouch(e.nativeEvent.locationX);
           }}
         />
         
@@ -445,6 +454,9 @@ function TinyInventoryForm({
 }
 
 export default function DashboardScreen() {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:458',message:'DashboardScreen rendering',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   const router = useRouter();
   const {
     profile,
@@ -453,9 +465,18 @@ export default function DashboardScreen() {
     soberMinutes,
     isLoading: sobrietyLoading,
   } = useSobriety();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:466',message:'useSobriety hook result',data:{hasProfile:!!profile,soberDays,isLoading:sobrietyLoading,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
 
   const { hasCheckedInToday, submitCheckin } = useCheckin();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:468',message:'useCheckin hook result',data:{hasCheckedInToday,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   const { entries } = useJournalStore();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:469',message:'useJournalStore hook result',data:{entriesCount:entries?.length||0,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   
   // Rhythm store
   const {
@@ -468,9 +489,15 @@ export default function DashboardScreen() {
     submitPulseCheck,
     submitTinyInventory,
   } = useRhythmStore();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:481',message:'useRhythmStore hook result',data:{hasIntention:!!todayIntention,hasInventory:!!todayInventory,pulseChecksCount:todayPulseChecks?.length||0,isLoading:rhythmLoading,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   
   // Load rhythm data on mount
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:485',message:'Loading today rhythm data',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
     loadTodayRhythm();
   }, []);
   

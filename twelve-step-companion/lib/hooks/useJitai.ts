@@ -84,9 +84,17 @@ export function useJitai() {
     // This would need step work history tracking
     
     // Map mood/craving trends
-    const mapTrend = (trend: string): 'rising' | 'stable' | 'declining' => {
+    // Note: For cravings, 'positive' means declining (good), 'negative' means rising (bad)
+    const mapMoodTrend = (trend: string): 'rising' | 'stable' | 'declining' => {
       if (trend === 'positive') return 'rising';
       if (trend === 'negative') return 'declining';
+      return 'stable';
+    };
+    
+    const mapCravingTrend = (trend: string): 'rising' | 'stable' | 'declining' => {
+      // Invert: 'positive' trend means declining cravings (good), 'negative' means rising (bad)
+      if (trend === 'positive') return 'declining';
+      if (trend === 'negative') return 'rising';
       return 'stable';
     };
     
@@ -99,8 +107,8 @@ export function useJitai() {
       daysSinceLastCheckin,
       lastMoodReported: todayCheckin?.mood ?? null,
       lastCravingReported: todayCheckin?.cravingLevel ?? null,
-      moodTrend: mapTrend(moodTrend),
-      cravingTrend: mapTrend(cravingTrend) === 'rising' ? 'declining' : mapTrend(cravingTrend) === 'declining' ? 'rising' : 'stable', // Invert for cravings
+      moodTrend: mapMoodTrend(moodTrend),
+      cravingTrend: mapCravingTrend(cravingTrend),
       averageMood7Days: averageMood || 5,
       averageCraving7Days: averageCraving || 3,
       daysSinceLastMeeting,

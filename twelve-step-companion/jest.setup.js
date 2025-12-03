@@ -97,44 +97,49 @@ jest.mock('expo-sharing', () => ({
   shareAsync: jest.fn(() => Promise.resolve()),
 }));
 
-// Mock expo-av
-jest.mock('expo-av', () => ({
-  Audio: {
-    Recording: jest.fn().mockImplementation(() => ({
-      prepareToRecordAsync: jest.fn(() => Promise.resolve()),
-      startAsync: jest.fn(() => Promise.resolve()),
-      stopAndUnloadAsync: jest.fn(() => Promise.resolve()),
-      getURI: jest.fn(() => 'file:///mock/recording.m4a'),
-      getStatusAsync: jest.fn(() =>
-        Promise.resolve({ canRecord: true, isRecording: false, durationMillis: 0 })
-      ),
+// Mock expo-audio
+jest.mock('expo-audio', () => {
+  const mockRecorder = {
+    prepareToRecordAsync: jest.fn(() => Promise.resolve()),
+    record: jest.fn(() => Promise.resolve()),
+    pause: jest.fn(() => Promise.resolve()),
+    stop: jest.fn(() => Promise.resolve()),
+    getURI: jest.fn(() => 'file:///mock/recording.m4a'),
+    remove: jest.fn(() => Promise.resolve()),
+  };
+
+  const mockPlayer = {
+    play: jest.fn(() => Promise.resolve()),
+    pause: jest.fn(() => Promise.resolve()),
+    seekTo: jest.fn(() => Promise.resolve()),
+    remove: jest.fn(() => Promise.resolve()),
+  };
+
+  return {
+    useAudioRecorder: jest.fn(() => mockRecorder),
+    useAudioPlayer: jest.fn(() => mockPlayer),
+    useAudioRecorderState: jest.fn(() => ({
+      isRecording: false,
+      isPaused: false,
+      durationMillis: 0,
     })),
+    useAudioPlayerState: jest.fn(() => ({
+      isPlaying: false,
+      currentTime: 0,
+      duration: 0,
+      didJustFinish: false,
+    })),
+    AudioModule: {
+      requestRecordingPermissionsAsync: jest.fn(() =>
+        Promise.resolve({ granted: true, canAskAgain: true })
+      ),
+    },
     setAudioModeAsync: jest.fn(() => Promise.resolve()),
-    requestPermissionsAsync: jest.fn(() =>
-      Promise.resolve({ status: 'granted', canAskAgain: true })
-    ),
-    RecordingOptionsPresets: {
+    RecordingPresets: {
       HIGH_QUALITY: {},
     },
-  },
-  Sound: {
-    createAsync: jest.fn(() =>
-      Promise.resolve({
-        sound: {
-          playAsync: jest.fn(() => Promise.resolve()),
-          pauseAsync: jest.fn(() => Promise.resolve()),
-          stopAsync: jest.fn(() => Promise.resolve()),
-          unloadAsync: jest.fn(() => Promise.resolve()),
-          setPositionAsync: jest.fn(() => Promise.resolve()),
-          getStatusAsync: jest.fn(() =>
-            Promise.resolve({ isLoaded: true, isPlaying: false, positionMillis: 0 })
-          ),
-        },
-        status: { isLoaded: true },
-      })
-    ),
-  },
-}));
+  };
+});
 
 // Mock expo-router
 jest.mock('expo-router', () => ({
