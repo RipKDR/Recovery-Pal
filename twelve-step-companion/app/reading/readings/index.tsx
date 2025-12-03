@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Card } from '../../components/ui';
+import { Card } from '../../../components/ui';
 import {
   READINGS,
   READING_CATEGORIES,
@@ -20,7 +20,7 @@ import {
   getReadingById,
   getCommonReadings,
   type Reading,
-} from '../../lib/constants/readings';
+} from '../../../lib/constants/readings';
 
 export default function ReadingsLibraryScreen() {
   const router = useRouter();
