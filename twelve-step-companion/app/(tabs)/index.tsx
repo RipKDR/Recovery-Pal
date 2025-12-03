@@ -3,16 +3,17 @@
  * Main recovery dashboard - matches reference site design
  */
 
-import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
+import React, { useCallback, useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Href } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { SobrietyCounter } from '../../components/progress';
-import { Card, Button } from '../../components/ui';
+import { Card, Button, Slider } from '../../components/ui';
 import { useSobriety } from '../../lib/hooks/useSobriety';
 import { useCheckin } from '../../lib/hooks/useCheckin';
-import { useJournalStore } from '../../lib/store';
+import { useJournalStore, useRhythmStore } from '../../lib/store';
+import type { PulseContext, TinyInventory } from '../../lib/store/rhythmStore';
 import { STEP_PROMPTS } from '../../lib/constants/stepPrompts';
 
 // Enable LayoutAnimation for Android
@@ -67,12 +68,14 @@ function CollapsibleSection({
   isExpanded,
   onToggle,
   children,
+  badge,
 }: {
   icon: FeatherIconName;
   title: string;
   isExpanded: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  badge?: string;
 }) {
   return (
     <View className="bg-navy-800/40 rounded-2xl border border-surface-700/30 mb-4">
@@ -85,6 +88,11 @@ function CollapsibleSection({
         <View className="flex-row items-center gap-2">
           <Feather name={icon} size={18} color="#60a5fa" />
           <Text className="text-white font-semibold">{title}</Text>
+          {badge && (
+            <View className="bg-success-500/20 px-2 py-0.5 rounded-full">
+              <Text className="text-success-400 text-xs">{badge}</Text>
+            </View>
+          )}
         </View>
         <Feather 
           name={isExpanded ? 'chevron-up' : 'chevron-down'} 
@@ -102,9 +110,20 @@ function CollapsibleSection({
 }
 
 // Intention selector component
-function IntentionSelector({ onSelect }: { onSelect: (intention: string) => void }) {
+function IntentionSelector({ 
+  selectedIntention,
+  onSelect,
+  onSave,
+  isSaving,
+}: { 
+  selectedIntention: string | null;
+  onSelect: (intention: string) => void;
+  onSave: () => void;
+  isSaving: boolean;
+}) {
   const intentions = ['Stay Clean', 'Stay Connected', 'Be Gentle with Myself'];
-  const [selected, setSelected] = useState<string | null>(null);
+  const [customMode, setCustomMode] = useState(false);
+  const [customIntention, setCustomIntention] = useState('');
   
   return (
     <View>
@@ -116,52 +135,311 @@ function IntentionSelector({ onSelect }: { onSelect: (intention: string) => void
           <TouchableOpacity
             key={intention}
             onPress={() => {
-              setSelected(intention);
+              setCustomMode(false);
               onSelect(intention);
             }}
             className={`px-3 py-2 rounded-lg border ${
-              selected === intention 
+              selectedIntention === intention && !customMode
                 ? 'bg-primary-500/20 border-primary-500' 
                 : 'border-surface-600/50'
             }`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: selectedIntention === intention && !customMode }}
           >
-            <Text className={selected === intention ? 'text-primary-400' : 'text-surface-300'}>
+            <Text className={selectedIntention === intention && !customMode ? 'text-primary-400' : 'text-surface-300'}>
               {intention}
             </Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity className="px-3 py-2 rounded-lg border border-surface-600/50">
-          <Text className="text-surface-400">Custom</Text>
+        <TouchableOpacity 
+          onPress={() => {
+            setCustomMode(true);
+            onSelect(customIntention || '');
+          }}
+          className={`px-3 py-2 rounded-lg border ${
+            customMode ? 'bg-primary-500/20 border-primary-500' : 'border-surface-600/50'
+          }`}
+          accessibilityRole="button"
+        >
+          <Text className={customMode ? 'text-primary-400' : 'text-surface-400'}>Custom</Text>
         </TouchableOpacity>
       </View>
+      
+      {customMode && (
+        <View className="mb-3">
+          <View className="bg-navy-900/60 rounded-lg border border-surface-600/50 px-3 py-2">
+            <Text 
+              className="text-white"
+              onPress={() => {
+                Alert.prompt(
+                  'Custom Intention',
+                  'What is your intention for today?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Set', 
+                      onPress: (text: string | undefined) => {
+                        if (text) {
+                          setCustomIntention(text);
+                          onSelect(text || '');
+                        }
+                      }
+                    }
+                  ],
+                  'plain-text',
+                  customIntention
+                );
+              }}
+            >
+              {customIntention || 'Tap to enter your intention...'}
+            </Text>
+          </View>
+        </View>
+      )}
+      
+      <Button
+        title={isSaving ? 'Saving...' : 'Set Intention'}
+        onPress={onSave}
+        variant="outline"
+        icon="check"
+        disabled={!selectedIntention || isSaving}
+      />
     </View>
   );
 }
 
-// Mood slider component
-function MoodSlider({ label, value, onChange, leftLabel, rightLabel }: {
+// Interactive Mood slider component
+function MoodSlider({ 
+  label, 
+  value, 
+  onChange, 
+  leftLabel, 
+  rightLabel,
+  color = 'primary',
+}: {
   label: string;
   value: number;
   onChange: (val: number) => void;
   leftLabel: string;
   rightLabel: string;
+  color?: 'primary' | 'danger' | 'success';
 }) {
+  const colorClasses = {
+    primary: 'bg-primary-500',
+    danger: 'bg-danger-500',
+    success: 'bg-success-500',
+  };
+  
+  const getValueLabel = () => {
+    if (value <= 3) return leftLabel;
+    if (value >= 7) return rightLabel;
+    return 'Okay';
+  };
+
   return (
     <View className="mb-4">
       <View className="flex-row justify-between mb-2">
         <Text className="text-surface-300">{label}</Text>
-        <Text className="text-primary-400">{value <= 3 ? leftLabel : value >= 7 ? rightLabel : 'Okay'}</Text>
+        <Text className="text-primary-400">{getValueLabel()} ({value})</Text>
       </View>
-      <View className="h-2 bg-surface-700/50 rounded-full">
+      
+      {/* Slider track */}
+      <View className="h-8 justify-center">
+        <View className="h-2 bg-surface-700/50 rounded-full relative">
+          <View 
+            className={`h-2 ${colorClasses[color]} rounded-full`}
+            style={{ width: `${value * 10}%` }} 
+          />
+        </View>
+        
+        {/* Slider thumb - touchable area */}
         <View 
-          className="h-2 bg-primary-500 rounded-full" 
-          style={{ width: `${value * 10}%` }} 
+          className="absolute h-8 w-full"
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => true}
+          onResponderGrant={(e) => {
+            const { locationX } = e.nativeEvent;
+            const containerWidth = e.nativeEvent.target ? 300 : 300; // Approximate width
+            const newValue = Math.max(1, Math.min(10, Math.round((locationX / containerWidth) * 10)));
+            onChange(newValue);
+          }}
+          onResponderMove={(e) => {
+            const { locationX } = e.nativeEvent;
+            const containerWidth = 300; // Approximate width
+            const newValue = Math.max(1, Math.min(10, Math.round((locationX / containerWidth) * 10)));
+            onChange(newValue);
+          }}
+        />
+        
+        {/* Thumb indicator */}
+        <View 
+          className={`absolute w-5 h-5 ${colorClasses[color]} rounded-full border-2 border-white`}
+          style={{ left: `${(value - 1) * 11}%`, top: 6 }}
+          pointerEvents="none"
         />
       </View>
+      
+      {/* Quick value buttons */}
+      <View className="flex-row justify-between mt-2">
+        {[1, 3, 5, 7, 10].map((v) => (
+          <TouchableOpacity
+            key={v}
+            onPress={() => onChange(v)}
+            className={`w-8 h-8 rounded-full items-center justify-center ${
+              value === v ? 'bg-primary-500/30' : 'bg-surface-700/30'
+            }`}
+            accessibilityRole="button"
+            accessibilityLabel={`Set ${label.toLowerCase()} to ${v}`}
+          >
+            <Text className={`text-xs ${value === v ? 'text-primary-400 font-semibold' : 'text-surface-400'}`}>
+              {v}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      
       <View className="flex-row justify-between mt-1">
         <Text className="text-surface-500 text-xs">{leftLabel}</Text>
         <Text className="text-surface-500 text-xs">{rightLabel}</Text>
       </View>
+    </View>
+  );
+}
+
+// Context tag selector
+function ContextSelector({
+  selectedContexts,
+  onToggle,
+}: {
+  selectedContexts: PulseContext[];
+  onToggle: (context: PulseContext) => void;
+}) {
+  const contexts: { key: PulseContext; label: string }[] = [
+    { key: 'alone', label: 'Alone' },
+    { key: 'with_people', label: 'With people' },
+    { key: 'bored', label: 'Bored' },
+    { key: 'stressed', label: 'Stressed' },
+    { key: 'hungry', label: 'Hungry' },
+    { key: 'tired', label: 'Tired' },
+    { key: 'anxious', label: 'Anxious' },
+    { key: 'angry', label: 'Angry' },
+  ];
+
+  return (
+    <View className="flex-row flex-wrap gap-2">
+      {contexts.map(({ key, label }) => {
+        const isSelected = selectedContexts.includes(key);
+        return (
+          <TouchableOpacity
+            key={key}
+            onPress={() => onToggle(key)}
+            className={`px-3 py-2 rounded-lg border ${
+              isSelected 
+                ? 'bg-primary-500/20 border-primary-500' 
+                : 'border-surface-600/50'
+            }`}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isSelected }}
+          >
+            <Text className={`text-sm ${isSelected ? 'text-primary-400' : 'text-surface-300'}`}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// Tiny Inventory component
+function TinyInventoryForm({
+  onSubmit,
+  isSaving,
+}: {
+  onSubmit: (data: Omit<TinyInventory, 'id' | 'date' | 'createdAt'>) => void;
+  isSaving: boolean;
+}) {
+  const [stayedClean, setStayedClean] = useState<TinyInventory['stayedClean'] | null>(null);
+  const [attendedMeeting, setAttendedMeeting] = useState(false);
+  const [contactedSponsor, setContactedSponsor] = useState(false);
+  const [contactedFellowship, setContactedFellowship] = useState(false);
+
+  const handleSubmit = () => {
+    if (!stayedClean) {
+      Alert.alert('Required', 'Please answer "Did I stay clean today?"');
+      return;
+    }
+    onSubmit({
+      stayedClean,
+      attendedMeeting,
+      contactedSponsor,
+      contactedFellowship,
+    });
+  };
+
+  return (
+    <View>
+      <Text className="text-surface-400 text-sm mb-3">Did I stay clean today?</Text>
+      <View className="flex-row gap-3 mb-4">
+        {[
+          { value: 'yes' as const, label: 'Yes', color: 'success' },
+          { value: 'no' as const, label: 'No', color: 'danger' },
+          { value: 'close_call' as const, label: 'Close call', color: 'warning' },
+        ].map(({ value, label, color }) => (
+          <TouchableOpacity
+            key={value}
+            onPress={() => setStayedClean(value)}
+            className="flex-row items-center gap-2"
+            accessibilityRole="radio"
+            accessibilityState={{ selected: stayedClean === value }}
+          >
+            <View className={`w-5 h-5 rounded-full border-2 items-center justify-center ${
+              stayedClean === value 
+                ? `border-${color}-500 bg-${color}-500/20` 
+                : 'border-surface-500'
+            }`}>
+              {stayedClean === value && (
+                <View className={`w-2.5 h-2.5 rounded-full bg-${color}-500`} />
+              )}
+            </View>
+            <Text className={stayedClean === value ? 'text-white' : 'text-surface-300'}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      
+      <Text className="text-surface-400 text-sm mb-2">Did I stay connected?</Text>
+      <View className="gap-2 mb-4">
+        {[
+          { key: 'meeting', label: 'Meetings', value: attendedMeeting, setter: setAttendedMeeting },
+          { key: 'sponsor', label: 'Sponsor', value: contactedSponsor, setter: setContactedSponsor },
+          { key: 'fellowship', label: 'Recovery Friends', value: contactedFellowship, setter: setContactedFellowship },
+        ].map(({ key, label, value, setter }) => (
+          <TouchableOpacity 
+            key={key} 
+            className="flex-row items-center justify-between py-1"
+            onPress={() => setter(!value)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: value }}
+          >
+            <Text className="text-surface-300">{label}</Text>
+            <View className={`w-12 h-7 rounded-full p-1 ${value ? 'bg-success-500' : 'bg-surface-700/50'}`}>
+              <View 
+                className={`w-5 h-5 rounded-full bg-white ${value ? 'ml-auto' : ''}`}
+              />
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+      
+      <Button
+        title={isSaving ? 'Saving...' : 'Save Inventory'}
+        onPress={handleSubmit}
+        variant="outline"
+        icon="check"
+        disabled={!stayedClean || isSaving}
+      />
     </View>
   );
 }
@@ -176,19 +454,52 @@ export default function DashboardScreen() {
     isLoading: sobrietyLoading,
   } = useSobriety();
 
-  const { hasCheckedInToday } = useCheckin();
+  const { hasCheckedInToday, submitCheckin } = useCheckin();
   const { entries } = useJournalStore();
+  
+  // Rhythm store
+  const {
+    todayIntention,
+    todayPulseChecks,
+    todayInventory,
+    isLoading: rhythmLoading,
+    loadTodayRhythm,
+    setIntention,
+    submitPulseCheck,
+    submitTinyInventory,
+  } = useRhythmStore();
+  
+  // Load rhythm data on mount
+  useEffect(() => {
+    loadTodayRhythm();
+  }, []);
   
   // Section expansion states
   const [rhythmExpanded, setRhythmExpanded] = useState(true);
-  const [setToneExpanded, setSetToneExpanded] = useState(true);
+  const [setToneExpanded, setSetToneExpanded] = useState(!todayIntention);
   const [pulseExpanded, setPulseExpanded] = useState(true);
-  const [inventoryExpanded, setInventoryExpanded] = useState(true);
+  const [inventoryExpanded, setInventoryExpanded] = useState(!todayInventory);
   const [checkinExpanded, setCheckinExpanded] = useState(false);
   
-  // Check-in form state
+  // Form states
+  const [selectedIntention, setSelectedIntention] = useState<string | null>(null);
   const [mood, setMood] = useState(7);
   const [craving, setCraving] = useState(2);
+  const [selectedContexts, setSelectedContexts] = useState<PulseContext[]>([]);
+  const [isSavingIntention, setIsSavingIntention] = useState(false);
+  const [isSavingPulse, setIsSavingPulse] = useState(false);
+  const [isSavingInventory, setIsSavingInventory] = useState(false);
+
+  // Update expansion states when data loads
+  useEffect(() => {
+    if (todayIntention) {
+      setSetToneExpanded(false);
+      setSelectedIntention(todayIntention.intention);
+    }
+    if (todayInventory) {
+      setInventoryExpanded(false);
+    }
+  }, [todayIntention, todayInventory]);
 
   // Calculate current step (first incomplete)
   const getCurrentStep = () => {
@@ -213,6 +524,76 @@ export default function DashboardScreen() {
   const navigateTo = useCallback((route: string) => {
     router.push(route as Href);
   }, [router]);
+
+  // Intention save handler
+  const handleSaveIntention = async () => {
+    if (!selectedIntention) return;
+    setIsSavingIntention(true);
+    try {
+      const isCustom = !['Stay Clean', 'Stay Connected', 'Be Gentle with Myself'].includes(selectedIntention);
+      await setIntention(selectedIntention, isCustom);
+      setSetToneExpanded(false);
+      Alert.alert('Intention Set', `Your intention for today: "${selectedIntention}"`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save intention. Please try again.');
+    } finally {
+      setIsSavingIntention(false);
+    }
+  };
+
+  // Pulse check save handler
+  const handleSavePulseCheck = async () => {
+    setIsSavingPulse(true);
+    try {
+      await submitPulseCheck(mood, craving, selectedContexts);
+      // Also save to the main check-in store if not already checked in
+      if (!hasCheckedInToday) {
+        await submitCheckin(mood, craving);
+      }
+      Alert.alert('Pulse Check Saved', 'Your mood and craving levels have been recorded.');
+      // Reset context selections
+      setSelectedContexts([]);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save pulse check. Please try again.');
+    } finally {
+      setIsSavingPulse(false);
+    }
+  };
+
+  // Inventory save handler
+  const handleSaveInventory = async (data: Omit<TinyInventory, 'id' | 'date' | 'createdAt'>) => {
+    setIsSavingInventory(true);
+    try {
+      await submitTinyInventory(data);
+      setInventoryExpanded(false);
+      
+      if (data.stayedClean === 'no') {
+        Alert.alert(
+          'Recovery is Progress',
+          'Thank you for your honesty. Every day is a new opportunity. Would you like to reset your clean date?',
+          [
+            { text: 'Not Now', style: 'cancel' },
+            { text: 'Reset Date', onPress: () => navigateTo('/relapse') },
+          ]
+        );
+      } else {
+        Alert.alert('Inventory Saved', 'Great job reflecting on your day!');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save inventory. Please try again.');
+    } finally {
+      setIsSavingInventory(false);
+    }
+  };
+
+  // Toggle context selection
+  const toggleContext = (context: PulseContext) => {
+    setSelectedContexts(prev => 
+      prev.includes(context)
+        ? prev.filter(c => c !== context)
+        : [...prev, context]
+    );
+  };
 
   // If no profile, show onboarding prompt
   if (!sobrietyLoading && !profile) {
@@ -239,6 +620,10 @@ export default function DashboardScreen() {
       </SafeAreaView>
     );
   }
+
+  // Calculate rhythm completion
+  const rhythmComplete = todayIntention && todayPulseChecks.length > 0 && todayInventory;
+  const rhythmProgress = [todayIntention, todayPulseChecks.length > 0, todayInventory].filter(Boolean).length;
 
   return (
     <SafeAreaView className="flex-1 bg-navy-950">
@@ -348,6 +733,7 @@ export default function DashboardScreen() {
             title="Recovery Rhythm"
             isExpanded={rhythmExpanded}
             onToggle={() => toggleSection(setRhythmExpanded)}
+            badge={rhythmComplete ? '✓ Complete' : `${rhythmProgress}/3`}
           >
             <Text className="text-surface-400 text-sm mb-4">
               Three quick check-ins to build your daily recovery habit
@@ -362,18 +748,25 @@ export default function DashboardScreen() {
                 <View className="flex-row items-center gap-2">
                   <Feather name="sun" size={16} color="#fbbf24" />
                   <Text className="text-white font-medium">Set the Tone</Text>
+                  {todayIntention && (
+                    <Feather name="check-circle" size={14} color="#4ade80" />
+                  )}
                 </View>
                 <Feather name={setToneExpanded ? 'minus' : 'plus'} size={18} color="#64748b" />
               </TouchableOpacity>
               {setToneExpanded && (
                 <View className="px-3 pb-3">
-                  <IntentionSelector onSelect={() => {}} />
-                  <Button
-                    title="Set Intention"
-                    onPress={() => {}}
-                    variant="outline"
-                    icon="check"
-                    disabled
+                  {todayIntention ? (
+                    <View className="bg-success-500/10 rounded-lg p-3 mb-3 border border-success-500/30">
+                      <Text className="text-success-400 text-sm">Today's intention:</Text>
+                      <Text className="text-white font-medium mt-1">"{todayIntention.intention}"</Text>
+                    </View>
+                  ) : null}
+                  <IntentionSelector 
+                    selectedIntention={selectedIntention}
+                    onSelect={setSelectedIntention}
+                    onSave={handleSaveIntention}
+                    isSaving={isSavingIntention}
                   />
                 </View>
               )}
@@ -388,17 +781,30 @@ export default function DashboardScreen() {
                 <View className="flex-row items-center gap-2">
                   <Feather name="activity" size={16} color="#60a5fa" />
                   <Text className="text-white font-medium">Pulse Check</Text>
+                  {todayPulseChecks.length > 0 && (
+                    <View className="flex-row items-center gap-1">
+                      <Feather name="check-circle" size={14} color="#4ade80" />
+                      <Text className="text-surface-400 text-xs">({todayPulseChecks.length})</Text>
+                    </View>
+                  )}
                 </View>
                 <Feather name={pulseExpanded ? 'minus' : 'plus'} size={18} color="#64748b" />
               </TouchableOpacity>
               {pulseExpanded && (
                 <View className="px-3 pb-3">
+                  {todayPulseChecks.length > 0 && (
+                    <View className="bg-primary-500/10 rounded-lg p-3 mb-4 border border-primary-500/30">
+                      <Text className="text-primary-400 text-sm">Last check: Mood {todayPulseChecks[0].mood}/10, Craving {todayPulseChecks[0].cravingLevel}/10</Text>
+                    </View>
+                  )}
+                  
                   <MoodSlider
                     label="How's your mood?"
                     value={mood}
                     onChange={setMood}
                     leftLabel="Low"
                     rightLabel="Great"
+                    color="primary"
                   />
                   <MoodSlider
                     label="Craving intensity?"
@@ -406,24 +812,22 @@ export default function DashboardScreen() {
                     onChange={setCraving}
                     leftLabel="None"
                     rightLabel="Intense"
+                    color={craving >= 7 ? 'danger' : 'primary'}
                   />
                   
                   <Text className="text-surface-400 text-sm mb-2">Context (optional)</Text>
-                  <View className="flex-row flex-wrap gap-2 mb-4">
-                    {['Alone', 'With people', 'Bored', 'Stressed', 'Hungry'].map((ctx) => (
-                      <TouchableOpacity
-                        key={ctx}
-                        className="px-3 py-2 rounded-lg border border-surface-600/50"
-                      >
-                        <Text className="text-surface-300 text-sm">{ctx}</Text>
-                      </TouchableOpacity>
-                    ))}
+                  <View className="mb-4">
+                    <ContextSelector 
+                      selectedContexts={selectedContexts}
+                      onToggle={toggleContext}
+                    />
                   </View>
                   
                   <Button
-                    title="Save Check-In"
-                    onPress={() => navigateTo('/checkin')}
+                    title={isSavingPulse ? 'Saving...' : 'Save Check-In'}
+                    onPress={handleSavePulseCheck}
                     icon="check"
+                    disabled={isSavingPulse}
                   />
                 </View>
               )}
@@ -438,40 +842,27 @@ export default function DashboardScreen() {
                 <View className="flex-row items-center gap-2">
                   <Feather name="moon" size={16} color="#a78bfa" />
                   <Text className="text-white font-medium">Tiny Inventory</Text>
+                  {todayInventory && (
+                    <Feather name="check-circle" size={14} color="#4ade80" />
+                  )}
                 </View>
                 <Feather name={inventoryExpanded ? 'minus' : 'plus'} size={18} color="#64748b" />
               </TouchableOpacity>
               {inventoryExpanded && (
                 <View className="px-3 pb-3">
-                  <Text className="text-surface-400 text-sm mb-3">Did I stay clean today?</Text>
-                  <View className="flex-row gap-3 mb-4">
-                    {['Yes', 'No', 'Close call'].map((option) => (
-                      <TouchableOpacity
-                        key={option}
-                        className="flex-row items-center gap-2"
-                      >
-                        <View className="w-5 h-5 rounded-full border border-surface-500" />
-                        <Text className="text-surface-300">{option}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  
-                  <Text className="text-surface-400 text-sm mb-2">Did I stay connected?</Text>
-                  <View className="gap-2 mb-4">
-                    {['Meetings', 'Sponsor', 'Recovery Friends'].map((item) => (
-                      <View key={item} className="flex-row items-center justify-between">
-                        <Text className="text-surface-300">{item}</Text>
-                        <View className="w-10 h-6 bg-surface-700/50 rounded-full" />
-                      </View>
-                    ))}
-                  </View>
-                  
-                  <Button
-                    title="Reflect on Today"
-                    onPress={() => navigateTo('/journal/new')}
-                    variant="outline"
-                    icon="edit-3"
-                  />
+                  {todayInventory ? (
+                    <View className="bg-success-500/10 rounded-lg p-3 mb-3 border border-success-500/30">
+                      <Text className="text-success-400 text-sm">Inventory complete for today!</Text>
+                      <Text className="text-surface-300 text-xs mt-1">
+                        Stayed clean: {todayInventory.stayedClean === 'yes' ? '✓ Yes' : todayInventory.stayedClean === 'no' ? '✗ No' : '⚠ Close call'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <TinyInventoryForm 
+                      onSubmit={handleSaveInventory}
+                      isSaving={isSavingInventory}
+                    />
+                  )}
                 </View>
               )}
             </View>
@@ -483,6 +874,7 @@ export default function DashboardScreen() {
             title="Today's Check-in"
             isExpanded={checkinExpanded}
             onToggle={() => toggleSection(setCheckinExpanded)}
+            badge={hasCheckedInToday ? '✓' : undefined}
           >
             {hasCheckedInToday ? (
               <View className="items-center py-4">

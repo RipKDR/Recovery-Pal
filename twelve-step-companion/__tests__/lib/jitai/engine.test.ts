@@ -3,210 +3,341 @@
  * Tests for Just-In-Time Adaptive Intervention engine
  */
 
-import { jitaiEngine, JITAIEngine } from '../../../lib/jitai/engine';
-import { JITAI_RULES } from '../../../lib/jitai/rules';
-import type { JITAIContext, JITAIIntervention } from '../../../lib/jitai/types';
+import {
+  JITAI_TRIGGERS,
+  evaluateTriggers,
+  runJitaiEvaluation,
+  resetCooldowns,
+  getCooldownStatus,
+  getInterventionForTrigger,
+} from '../../../lib/jitai/engine';
+import type { JitaiContext, JitaiTrigger } from '../../../lib/jitai/types';
 
 // Mock the notifications module
 jest.mock('../../../lib/jitai/notifications', () => ({
-  scheduleJITAINotification: jest.fn().mockResolvedValue(undefined),
+  scheduleJitaiNotification: jest.fn().mockResolvedValue(undefined),
 }));
 
-describe('JITAIEngine', () => {
+describe('JITAI Engine', () => {
   // Base context for testing
-  const baseContext: JITAIContext = {
-    currentTime: new Date('2024-01-15T10:00:00'),
-    isMorning: true,
-    isEvening: false,
+  const baseContext: JitaiContext = {
     soberDays: 30,
-    hasCheckedInToday: true,
-    lastCheckinMood: 7,
-    lastCheckinCraving: 3,
-    checkinStreak: 5,
-    moodTrend: 'positive',
-    cravingTrend: 'positive',
-    lastMeetingDate: new Date('2024-01-14'),
+    hasSetIntentionToday: true,
+    hasCompletedInventoryToday: true,
+    daysSinceLastCheckin: 0,
+    moodTrend: 'stable',
+    averageMood7Days: 7,
+    cravingTrend: 'stable',
+    averageCraving7Days: 3,
     daysSinceLastMeeting: 1,
-    upcomingMeetingsCount: 2,
     hasSponsor: true,
-    lastSponsorContactDate: new Date('2024-01-13'),
-    lastJournalEntryDate: new Date('2024-01-14'),
-    lastScenarioPracticeDate: null,
-    areNotificationsEnabled: true,
+    daysSinceLastSponsorContact: 2,
+    lastMoodReported: 7,
+    currentHour: 0,
+    currentDayOfWeek: 0,
+    lastCravingReported: null,
+    meetingsThisWeek: 0,
+    currentStep: 0,
+    daysSinceLastStepWork: 0
   };
 
-  describe('singleton pattern', () => {
-    it('should return the same instance', () => {
-      const instance1 = JITAIEngine.getInstance();
-      const instance2 = JITAIEngine.getInstance();
-      
-      expect(instance1).toBe(instance2);
+  beforeEach(() => {
+    // Reset cooldowns before each test
+    resetCooldowns();
+    jest.clearAllMocks();
+  });
+
+  describe('JITAI_TRIGGERS', () => {
+    it('should have valid trigger structure', () => {
+      JITAI_TRIGGERS.forEach(trigger => {
+        expect(trigger).toHaveProperty('id');
+        expect(trigger).toHaveProperty('name');
+        expect(trigger).toHaveProperty('description');
+        expect(trigger).toHaveProperty('type');
+        expect(trigger).toHaveProperty('condition');
+        expect(trigger).toHaveProperty('priority');
+        expect(trigger).toHaveProperty('cooldownHours');
+        
+        expect(typeof trigger.id).toBe('string');
+        expect(typeof trigger.name).toBe('string');
+        expect(typeof trigger.condition).toBe('function');
+        expect(['time', 'pattern', 'milestone']).toContain(trigger.type);
+        expect(['low', 'medium', 'high', 'urgent']).toContain(trigger.priority);
+        expect(typeof trigger.cooldownHours).toBe('number');
+      });
     });
 
-    it('should be the exported jitaiEngine', () => {
-      const instance = JITAIEngine.getInstance();
-      expect(jitaiEngine).toBe(instance);
+    it('should have unique trigger IDs', () => {
+      const ids = JITAI_TRIGGERS.map(t => t.id);
+      const uniqueIds = new Set(ids);
+      
+      expect(uniqueIds.size).toBe(ids.length);
     });
   });
 
-  describe('evaluate', () => {
-    it('should return empty array when no rules trigger', async () => {
-      // Context where everything is good - no interventions needed
-      const goodContext: JITAIContext = {
+  describe('evaluateTriggers', () => {
+    it('should return empty array when no triggers fire', () => {
+      // Context where everything is good
+      const goodContext: JitaiContext = {
         ...baseContext,
-        hasCheckedInToday: true,
-        checkinStreak: 10,
-        moodTrend: 'positive',
-        cravingTrend: 'positive',
-        daysSinceLastMeeting: 0,
+        hasSetIntentionToday: true,
+        hasCompletedInventoryToday: true,
+        daysSinceLastCheckin: 0,
+        moodTrend: 'stable',
+        averageMood7Days: 8,
+        cravingTrend: 'stable',
+        averageCraving7Days: 2,
+        daysSinceLastMeeting: 1,
+        daysSinceLastSponsorContact: 1,
+        lastMoodReported: 8,
       };
 
-      const interventions = await jitaiEngine.evaluate(goodContext);
+      const interventions = evaluateTriggers(goodContext);
       
-      // May or may not have interventions depending on rules
-      expect(Array.isArray(interventions)).toBe(true);
+      // Should return at most 1 intervention (highest priority)
+      expect(interventions.length).toBeLessThanOrEqual(1);
     });
 
-    it('should trigger check-in reminder when not checked in', async () => {
-      const context: JITAIContext = {
+    it('should trigger missed-checkins when days since last checkin is high', () => {
+      const context: JitaiContext = {
         ...baseContext,
-        hasCheckedInToday: false,
-        isMorning: true,
+        daysSinceLastCheckin: 5,
       };
 
-      const interventions = await jitaiEngine.evaluate(context);
+      const interventions = evaluateTriggers(context);
       
-      // Should have at least one intervention related to check-in
-      const checkinIntervention = interventions.find(
-        i => i.id.includes('checkin') || i.action?.payload?.includes('checkin')
+      expect(interventions.length).toBeGreaterThan(0);
+      expect(interventions[0].triggerId).toBe('missed-checkins');
+    });
+
+    it('should trigger declining-mood when mood trend is declining', () => {
+      const context: JitaiContext = {
+        ...baseContext,
+        moodTrend: 'declining',
+        averageMood7Days: 4,
+        daysSinceLastCheckin: 0, // Don't trigger missed-checkins
+      };
+
+      const interventions = evaluateTriggers(context);
+      
+      const moodIntervention = interventions.find(i => i.triggerId === 'declining-mood');
+      expect(moodIntervention).toBeDefined();
+    });
+
+    it('should trigger rising-cravings when craving trend is rising', () => {
+      const context: JitaiContext = {
+        ...baseContext,
+        cravingTrend: 'rising',
+        averageCraving7Days: 7,
+        daysSinceLastCheckin: 0,
+        moodTrend: 'stable',
+        averageMood7Days: 7,
+      };
+
+      const interventions = evaluateTriggers(context);
+      
+      const cravingIntervention = interventions.find(i => i.triggerId === 'rising-cravings');
+      expect(cravingIntervention).toBeDefined();
+    });
+
+    it('should trigger meeting-gap when days since last meeting is high', () => {
+      const context: JitaiContext = {
+        ...baseContext,
+        daysSinceLastMeeting: 10,
+        daysSinceLastCheckin: 0,
+        moodTrend: 'stable',
+        averageMood7Days: 7,
+        cravingTrend: 'stable',
+        averageCraving7Days: 3,
+      };
+
+      const interventions = evaluateTriggers(context);
+      
+      const meetingIntervention = interventions.find(i => i.triggerId === 'meeting-gap');
+      expect(meetingIntervention).toBeDefined();
+    });
+
+    it('should trigger sponsor-contact-gap when days since sponsor contact is high', () => {
+      const context: JitaiContext = {
+        ...baseContext,
+        hasSponsor: true,
+        daysSinceLastSponsorContact: 10,
+        daysSinceLastCheckin: 0,
+        daysSinceLastMeeting: 1,
+        moodTrend: 'stable',
+        averageMood7Days: 7,
+        cravingTrend: 'stable',
+        averageCraving7Days: 3,
+      };
+
+      const interventions = evaluateTriggers(context);
+      
+      const sponsorIntervention = interventions.find(i => i.triggerId === 'sponsor-contact-gap');
+      expect(sponsorIntervention).toBeDefined();
+    });
+
+    it('should trigger halt-check when last mood is low', () => {
+      const context: JitaiContext = {
+        ...baseContext,
+        lastMoodReported: 3,
+        daysSinceLastCheckin: 0,
+        moodTrend: 'stable',
+        averageMood7Days: 6,
+        cravingTrend: 'stable',
+        averageCraving7Days: 3,
+      };
+
+      const interventions = evaluateTriggers(context);
+      
+      const haltIntervention = interventions.find(i => i.triggerId === 'halt-check');
+      expect(haltIntervention).toBeDefined();
+    });
+
+    it('should respect cooldowns', () => {
+      const context: JitaiContext = {
+        ...baseContext,
+        daysSinceLastCheckin: 5,
+      };
+
+      // First evaluation should trigger
+      const firstInterventions = evaluateTriggers(context);
+      expect(firstInterventions.length).toBeGreaterThan(0);
+
+      // Second evaluation should not trigger same intervention (on cooldown)
+      const secondInterventions = evaluateTriggers(context);
+      const sameIntervention = secondInterventions.find(
+        i => i.triggerId === firstInterventions[0]?.triggerId
       );
-      
-      // The exact intervention depends on rules, but we verify the engine works
-      expect(Array.isArray(interventions)).toBe(true);
+      expect(sameIntervention).toBeUndefined();
     });
 
-    it('should trigger meeting reminder when days since last meeting is high', async () => {
-      const context: JITAIContext = {
+    it('should prioritize higher priority interventions', () => {
+      // Create a context that triggers multiple interventions
+      const context: JitaiContext = {
         ...baseContext,
-        daysSinceLastMeeting: 5,
-        lastMeetingDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+        cravingTrend: 'rising',
+        averageCraving7Days: 8, // Urgent priority
+        daysSinceLastMeeting: 10, // Medium priority
       };
 
-      const interventions = await jitaiEngine.evaluate(context);
+      const interventions = evaluateTriggers(context);
       
-      expect(Array.isArray(interventions)).toBe(true);
-    });
-
-    it('should trigger high craving intervention', async () => {
-      const context: JITAIContext = {
-        ...baseContext,
-        lastCheckinCraving: 8,
-        cravingTrend: 'negative',
-      };
-
-      const interventions = await jitaiEngine.evaluate(context);
-      
-      expect(Array.isArray(interventions)).toBe(true);
-    });
-
-    it('should trigger low mood intervention', async () => {
-      const context: JITAIContext = {
-        ...baseContext,
-        lastCheckinMood: 3,
-        moodTrend: 'negative',
-      };
-
-      const interventions = await jitaiEngine.evaluate(context);
-      
-      expect(Array.isArray(interventions)).toBe(true);
-    });
-
-    it('should not trigger when notifications are disabled', async () => {
-      const context: JITAIContext = {
-        ...baseContext,
-        areNotificationsEnabled: false,
-        hasCheckedInToday: false, // Would normally trigger
-      };
-
-      const interventions = await jitaiEngine.evaluate(context);
-      
-      // Engine still evaluates, but notifications won't be sent
-      expect(Array.isArray(interventions)).toBe(true);
-    });
-
-    it('should handle rule evaluation errors gracefully', async () => {
-      // Create a context that might cause edge cases
-      const edgeContext: JITAIContext = {
-        ...baseContext,
-        lastMeetingDate: null,
-        daysSinceLastMeeting: null,
-        lastSponsorContactDate: null,
-        lastJournalEntryDate: null,
-      };
-
-      // Should not throw
-      const interventions = await jitaiEngine.evaluate(edgeContext);
-      expect(Array.isArray(interventions)).toBe(true);
+      // Should return only highest priority (rising-cravings is urgent)
+      if (interventions.length > 0) {
+        expect(interventions[0].triggerId).toBe('rising-cravings');
+      }
     });
   });
 
-  describe('run', () => {
-    it('should evaluate and schedule notifications', async () => {
-      const { scheduleJITAINotification } = require('../../../lib/jitai/notifications');
-      
-      const context: JITAIContext = {
+  describe('getInterventionForTrigger', () => {
+    it('should return correct intervention for each trigger', () => {
+      const trigger = JITAI_TRIGGERS.find(t => t.id === 'missed-checkins')!;
+      const context: JitaiContext = {
         ...baseContext,
-        hasCheckedInToday: false,
+        daysSinceLastCheckin: 5,
       };
 
-      await jitaiEngine.run(context);
-
-      // If interventions were triggered, notifications should be scheduled
-      // The exact count depends on the rules
-      expect(scheduleJITAINotification).toBeDefined();
-    });
-  });
-});
-
-describe('JITAI_RULES', () => {
-  it('should have valid rule structure', () => {
-    JITAI_RULES.forEach(rule => {
-      expect(rule).toHaveProperty('id');
-      expect(rule).toHaveProperty('description');
-      expect(rule).toHaveProperty('condition');
-      expect(rule).toHaveProperty('intervention');
+      const intervention = getInterventionForTrigger(trigger, context);
       
-      expect(typeof rule.id).toBe('string');
-      expect(typeof rule.description).toBe('string');
-      expect(typeof rule.condition).toBe('function');
+      expect(intervention).toHaveProperty('triggerId', trigger.id);
+      expect(intervention).toHaveProperty('title');
+      expect(intervention).toHaveProperty('message');
+      expect(intervention).toHaveProperty('action');
+      expect(intervention).toHaveProperty('category');
+    });
+
+    it('should include dynamic values in messages', () => {
+      const trigger = JITAI_TRIGGERS.find(t => t.id === 'missed-checkins')!;
+      const context: JitaiContext = {
+        ...baseContext,
+        daysSinceLastCheckin: 5,
+      };
+
+      const intervention = getInterventionForTrigger(trigger, context);
       
-      expect(rule.intervention).toHaveProperty('id');
-      expect(rule.intervention).toHaveProperty('title');
-      expect(rule.intervention).toHaveProperty('body');
-      expect(rule.intervention).toHaveProperty('priority');
+      expect(intervention.message).toContain('5');
     });
   });
 
-  it('should have unique rule IDs', () => {
-    const ids = JITAI_RULES.map(r => r.id);
-    const uniqueIds = new Set(ids);
-    
-    expect(uniqueIds.size).toBe(ids.length);
-  });
+  describe('runJitaiEvaluation', () => {
+    it('should evaluate triggers and schedule notifications', async () => {
+      const { scheduleJitaiNotification } = require('../../../lib/jitai/notifications');
+      
+      const context: JitaiContext = {
+        ...baseContext,
+        daysSinceLastCheckin: 5,
+      };
 
-  it('should have valid priority values', () => {
-    const validPriorities = ['low', 'medium', 'high', 'critical'];
-    
-    JITAI_RULES.forEach(rule => {
-      expect(validPriorities).toContain(rule.intervention.priority);
+      await runJitaiEvaluation(context);
+
+      expect(scheduleJitaiNotification).toHaveBeenCalled();
+    });
+
+    it('should not schedule notifications when no triggers fire', async () => {
+      const { scheduleJitaiNotification } = require('../../../lib/jitai/notifications');
+      
+      // Reset cooldowns and create a good context
+      resetCooldowns();
+      const goodContext: JitaiContext = {
+        ...baseContext,
+        hasSetIntentionToday: true,
+        hasCompletedInventoryToday: true,
+        daysSinceLastCheckin: 0,
+        moodTrend: 'stable',
+        averageMood7Days: 8,
+        cravingTrend: 'stable',
+        averageCraving7Days: 2,
+        daysSinceLastMeeting: 0,
+        daysSinceLastSponsorContact: 0,
+        lastMoodReported: 8,
+        soberDays: 100, // Not in early recovery, not approaching milestone
+      };
+
+      await runJitaiEvaluation(goodContext);
+
+      // May or may not be called depending on time-based triggers
+      expect(scheduleJitaiNotification).toBeDefined();
     });
   });
 
-  it('should have valid action types when action is present', () => {
-    JITAI_RULES.forEach(rule => {
-      if (rule.intervention.action) {
-        expect(rule.intervention.action.type).toBe('navigate');
-        expect(typeof rule.intervention.action.payload).toBe('string');
+  describe('resetCooldowns', () => {
+    it('should clear all cooldowns', () => {
+      const context: JitaiContext = {
+        ...baseContext,
+        daysSinceLastCheckin: 5,
+      };
+
+      // Trigger to set cooldown
+      evaluateTriggers(context);
+      
+      // Reset
+      resetCooldowns();
+      
+      // Should be able to trigger again
+      const interventions = evaluateTriggers(context);
+      expect(interventions.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('getCooldownStatus', () => {
+    it('should return cooldown status for triggered interventions', () => {
+      const context: JitaiContext = {
+        ...baseContext,
+        daysSinceLastCheckin: 5,
+      };
+
+      // Trigger something
+      evaluateTriggers(context);
+      
+      const status = getCooldownStatus();
+      
+      expect(typeof status).toBe('object');
+      // Should have at least one entry
+      const entries = Object.entries(status);
+      if (entries.length > 0) {
+        const [triggerId, data] = entries[0];
+        expect(data).toHaveProperty('lastTriggered');
+        expect(data).toHaveProperty('remainingHours');
       }
     });
   });

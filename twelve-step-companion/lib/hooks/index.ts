@@ -19,3 +19,6 @@ export { useRegularMeetings } from './useRegularMeetings';
 // Phase 4 Hooks
 export { useAchievements } from './useAchievements';
 
+// JITAI Hook
+export { useJitai } from './useJitai';
+

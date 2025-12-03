@@ -4,10 +4,11 @@
  */
 
 import React from 'react';
-import { View, Text, ScrollView, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Card } from '../../components/ui';
+import { Card, Button } from '../../components/ui';
 import { useCheckin } from '../../lib/hooks/useCheckin';
 import { useJournalStore } from '../../lib/store';
 
@@ -77,6 +78,7 @@ function StatCard({
 }
 
 export default function InsightsScreen() {
+  const router = useRouter();
   const { 
     checkinStreak, 
     averageMood, 
@@ -113,7 +115,19 @@ export default function InsightsScreen() {
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View className="px-4 pt-4 pb-6">
-          <Text className="text-2xl font-bold text-white mb-1">Mood Analytics</Text>
+          <View className="flex-row items-center justify-between mb-1">
+            <Text className="text-2xl font-bold text-white">Mood Analytics</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/weekly-report')}
+              className="flex-row items-center bg-primary-500/20 px-3 py-2 rounded-lg"
+              accessibilityRole="button"
+              accessibilityLabel="View weekly report"
+              accessibilityHint="Opens your comprehensive weekly recovery summary"
+            >
+              <Feather name="file-text" size={16} color="#60a5fa" />
+              <Text className="text-primary-400 text-sm font-medium ml-2">Weekly Report</Text>
+            </TouchableOpacity>
+          </View>
           <Text className="text-surface-400">
             Track your mood patterns and journal activity
           </Text>

@@ -22,6 +22,8 @@ const DAILY_CHECKIN_NOTIFICATION_ID = 'daily-checkin-reminder';
 const MILESTONE_NOTIFICATION_ID = 'milestone-celebration';
 const MEETING_REMINDER_NOTIFICATION_ID = 'meeting-reminder';
 const TIME_CAPSULE_NOTIFICATION_PREFIX = 'time-capsule-';
+const ACHIEVEMENT_NOTIFICATION_PREFIX = 'achievement-';
+const REGULAR_MEETING_REMINDER_PREFIX = 'regular-meeting-';
 
 /**
  * Request notification permissions
@@ -323,5 +325,88 @@ export async function initializeNotifications(
   
   // Always clear badge on app open
   await clearBadge();
+}
+
+/**
+ * Schedule an achievement unlock notification
+ * @param achievement - The unlocked achievement
+ */
+export async function scheduleAchievementNotification(
+  achievement: { id: string; title: string; description: string; icon: string }
+): Promise<void> {
+  await Notifications.scheduleNotificationAsync({
+    identifier: `${ACHIEVEMENT_NOTIFICATION_PREFIX}${achievement.id}`,
+    content: {
+      title: `${achievement.icon} Achievement Unlocked!`,
+      body: `${achievement.title}: ${achievement.description}`,
+      data: { screen: 'achievements', achievementId: achievement.id },
+      sound: true,
+      badge: 1,
+    },
+    trigger: null, // Immediate
+  });
+}
+
+/**
+ * Schedule a regular meeting reminder
+ * @param meetingId - The meeting ID
+ * @param meetingName - The meeting name
+ * @param dayOfWeek - Day of week (0 = Sunday, 6 = Saturday)
+ * @param time - Time in HH:mm format
+ * @param reminderMinutes - Minutes before meeting to remind
+ */
+export async function scheduleRegularMeetingReminder(
+  meetingId: string,
+  meetingName: string,
+  dayOfWeek: number,
+  time: string,
+  reminderMinutes: number = 30
+): Promise<void> {
+  // Cancel existing reminder for this meeting
+  await cancelRegularMeetingReminder(meetingId);
+
+  const [hours, minutes] = time.split(':').map(Number);
+  
+  // Calculate reminder time
+  let reminderHour = hours;
+  let reminderMinute = minutes - reminderMinutes;
+  
+  if (reminderMinute < 0) {
+    reminderMinute += 60;
+    reminderHour -= 1;
+    if (reminderHour < 0) {
+      reminderHour = 23;
+    }
+  }
+
+  // Create weekly trigger
+  const trigger: Notifications.NotificationTriggerInput = {
+    type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+    weekday: dayOfWeek + 1, // expo-notifications uses 1-7 (Sunday = 1)
+    hour: reminderHour,
+    minute: reminderMinute,
+  };
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: `${REGULAR_MEETING_REMINDER_PREFIX}${meetingId}`,
+    content: {
+      title: '📍 Meeting Reminder',
+      body: `${meetingName} starts in ${reminderMinutes} minutes`,
+      data: { screen: 'meetings', meetingId },
+      sound: true,
+    },
+    trigger,
+  });
+
+  console.log(`Regular meeting reminder scheduled for ${meetingName} on day ${dayOfWeek} at ${reminderHour}:${reminderMinute}`);
+}
+
+/**
+ * Cancel a regular meeting reminder
+ */
+export async function cancelRegularMeetingReminder(meetingId: string): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(
+    `${REGULAR_MEETING_REMINDER_PREFIX}${meetingId}`
+  );
 }
 

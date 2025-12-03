@@ -28,3 +28,7 @@ export { useTenthStepStore } from './tenthStepStore';
 // Phase 4 Stores
 export { useAchievementStore } from './achievementStore';
 
+// Recovery Rhythm Store
+export { useRhythmStore } from './rhythmStore';
+export type { PulseContext, DailyIntention, PulseCheck, TinyInventory } from './rhythmStore';
+

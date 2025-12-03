@@ -19,6 +19,11 @@ import {
   addNotificationResponseListener,
   addNotificationReceivedListener,
 } from '../lib/notifications';
+import {
+  initializeErrorTracking,
+  captureException,
+  logNavigation,
+} from '../lib/services/errorTracking';
 import { CrisisButton, ErrorBoundary } from '../components/common';
 import '../global.css';
 
@@ -53,6 +58,9 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
       setIsRetrying(true);
       setError(null);
       
+      // Initialize error tracking first (so we can capture init errors)
+      initializeErrorTracking();
+      
       // Initialize database
       await initializeDatabase();
       
@@ -65,6 +73,10 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
       setIsReady(true);
     } catch (err) {
       console.error('Initialization error:', err);
+      captureException(err as Error, {
+        component: 'AppInitializer',
+        action: 'initialize',
+      });
       setError('Failed to initialize app. Please try again.');
     } finally {
       setIsRetrying(false);
@@ -102,9 +114,24 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
       
       // Navigate based on notification data
       if (data?.screen === 'checkin') {
+        logNavigation('checkin', { source: 'notification' });
         router.push('/checkin');
       } else if (data?.screen === 'progress') {
+        logNavigation('insights', { source: 'notification' });
         router.push('/(tabs)/insights');
+      } else if (data?.screen === 'achievements') {
+        logNavigation('achievements', { source: 'notification' });
+        router.push('/achievements');
+      } else if (data?.screen === 'emergency') {
+        logNavigation('emergency', { source: 'notification' });
+        router.push('/(tabs)/emergency');
+      } else if (data?.screen === 'scenarios') {
+        logNavigation('scenarios', { source: 'notification' });
+        router.push('/scenarios');
+      } else if (data?.type === 'navigate' && data?.payload) {
+        // Handle JITAI navigation
+        logNavigation(data.payload as string, { source: 'jitai_notification' });
+        router.push(data.payload as string);
       }
     });
 

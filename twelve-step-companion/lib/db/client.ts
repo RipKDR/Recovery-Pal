@@ -383,6 +383,14 @@ export async function initializeDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_promise_experienced ON promise_experiences(experienced);
     CREATE INDEX IF NOT EXISTS idx_step_progress_number ON step_progress(step_number);
     CREATE INDEX IF NOT EXISTS idx_step_answers_step ON step_answers(step_number);
+
+    -- Additional performance indexes
+    CREATE INDEX IF NOT EXISTS idx_meeting_logs_attended ON meeting_logs(attended_at);
+    CREATE INDEX IF NOT EXISTS idx_meeting_logs_regular ON meeting_logs(regular_meeting_id);
+    CREATE INDEX IF NOT EXISTS idx_step_answers_composite ON step_answers(step_number, question_index);
+    CREATE INDEX IF NOT EXISTS idx_journal_step ON journal_entries(step_number);
+    CREATE INDEX IF NOT EXISTS idx_contacts_last_contacted ON recovery_contacts(last_contacted_at);
+    CREATE INDEX IF NOT EXISTS idx_phone_logs_contact ON phone_call_logs(contact_id);
   `);
 
   // Run versioned migrations for existing databases

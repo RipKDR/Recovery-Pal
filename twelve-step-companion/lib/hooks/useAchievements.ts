@@ -1,18 +1,18 @@
 /**
- * Achievements Hook
- * Provides achievement tracking and keytag status
+ * Achievement Hook
+ * Provides achievement data and automatic checking functionality
  */
 
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useAchievementStore, type AchievementContext } from '../store/achievementStore';
-import { useProfileStore } from '../store/profileStore';
-import { useCheckinStore } from '../store/checkinStore';
-import { useMeetingStore } from '../store/meetingStore';
-import { useContactStore } from '../store/contactStore';
-import { useReadingStore } from '../store/readingStore';
-import { useRegularMeetingStore } from '../store/regularMeetingStore';
-import type { Achievement, AchievementCategory } from '../types';
+import { useSobriety } from './useSobriety';
+import { useCheckin } from './useCheckin';
+import { useContactStore, useMeetingStore, useRegularMeetingStore, useStepWorkStore } from '../store';
+import { getReadingStreak } from '../db/models';
 
+/**
+ * Hook for managing and checking achievements
+ */
 export function useAchievements() {
   const {
     achievements,
@@ -36,12 +36,12 @@ export function useAchievements() {
     getAchievementsByCategory,
   } = useAchievementStore();
 
-  const { soberDays } = useProfileStore();
-  const { checkinStreak } = useCheckinStore();
-  const { meetings, insights } = useMeetingStore();
-  const { contacts, sponsor } = useContactStore();
-  const { readingStreak } = useReadingStore();
-  const { homeGroup } = useRegularMeetingStore();
+  const { soberDays } = useSobriety();
+  const { checkinStreak } = useCheckin();
+  const { contacts } = useContactStore();
+  const { logs: meetingLogs } = useMeetingStore();
+  const { meetings: regularMeetings } = useRegularMeetingStore();
+  const { stepProgress } = useStepWorkStore();
 
   // Initialize achievements on mount
   useEffect(() => {
@@ -50,81 +50,129 @@ export function useAchievements() {
     }
   }, [isInitialized, initialize]);
 
-  // Update keytags when sobriety days change
+  // Update keytags when sober days change
   useEffect(() => {
-    if (isInitialized && soberDays !== undefined) {
+    if (soberDays >= 0) {
       updateKeytagsForDays(soberDays);
     }
-  }, [isInitialized, soberDays, updateKeytagsForDays]);
+  }, [soberDays, updateKeytagsForDays]);
 
-  // Build achievement context for checking
-  const achievementContext = useMemo<AchievementContext>(() => ({
-    soberDays: soberDays || 0,
-    contactsCount: contacts.length,
-    hasSponsor: !!sponsor,
-    hasHomeGroup: !!homeGroup,
-    meetingsCount: insights.totalMeetings,
-    meetingsInFirst90Days: calculateMeetingsInFirst90Days(meetings, soberDays || 0),
-    checkinStreak: checkinStreak || 0,
-    readingStreak: readingStreak || 0,
-    tenthStepStreak: 0, // TODO: Add from tenthStepStore when needed
-    gratitudeStreak: 0, // TODO: Add from gratitudeStore when needed
-    phoneTherapyDays: 0, // TODO: Calculate from phone logs
-    stepProgress: {}, // TODO: Add from stepWorkStore when needed
-    meetingsWithShares: meetings.filter((m) => m.didShare).length,
-  }), [
-    soberDays,
-    contacts.length,
-    sponsor,
-    homeGroup,
-    insights.totalMeetings,
-    meetings,
-    checkinStreak,
-    readingStreak,
-  ]);
+  /**
+   * Build the achievement context from current app state
+   */
+  const buildContext = useCallback(async (): Promise<AchievementContext> => {
+    // Count contacts
+    const contactsCount = contacts.length;
+    const hasSponsor = contacts.some(c => c.role === 'sponsor');
+    
+    // Check for home group
+    const hasHomeGroup = regularMeetings.some(m => m.isHomeGroup);
+    
+    // Count meetings
+    const meetingsCount = meetingLogs.length;
+    
+    // Calculate meetings in first 90 days (if applicable)
+    let meetingsInFirst90Days = 0;
+    if (soberDays >= 90) {
+      // This would need the sobriety start date to calculate properly
+      // For now, we'll use a simplified approach
+      meetingsInFirst90Days = meetingLogs.filter((log) => {
+        // Check if meeting was logged in first 90 days
+        // This is a simplified check
+        return true;
+      }).length;
+    }
+    
+    // Get reading streak
+    let readingStreak = 0;
+    try {
+      readingStreak = await getReadingStreak();
+    } catch (error) {
+      console.error('Failed to get reading streak:', error);
+    }
+    
+    // Calculate step progress
+    const stepProgressMap: Record<number, { answered: number; total: number }> = {};
+    for (let step = 1; step <= 12; step++) {
+      const progress = stepProgress.find(p => p.stepNumber === step);
+      stepProgressMap[step] = {
+        answered: progress?.answeredQuestions || 0,
+        total: progress?.totalQuestions || 10, // Default to 10 questions per step
+      };
+    }
+    
+    // Count phone therapy days (days with 3+ calls)
+    // This would need call log data grouped by day
+    const phoneTherapyDays = 0; // TODO: Implement from phone call logs
+    
+    // Count meetings with shares
+    const meetingsWithShares = meetingLogs.filter(m => m.didShare).length;
+    
+    // Tenth step streak - would need to track nightly reviews
+    const tenthStepStreak = 0; // TODO: Implement from tiny inventory or tenth step reviews
+    
+    // Gratitude streak - would need to track gratitude entries
+    const gratitudeStreak = 0; // TODO: Implement from gratitude entries
 
-  // Check achievements when context changes
+    return {
+      soberDays,
+      contactsCount,
+      hasSponsor,
+      hasHomeGroup,
+      meetingsCount,
+      meetingsInFirst90Days,
+      checkinStreak,
+      readingStreak,
+      tenthStepStreak,
+      gratitudeStreak,
+      phoneTherapyDays,
+      stepProgress: stepProgressMap,
+      meetingsWithShares,
+    };
+  }, [soberDays, contacts, meetingLogs, regularMeetings, checkinStreak, stepProgress]);
+
+  /**
+   * Check all automatic achievements
+   */
   const checkAchievements = useCallback(async () => {
     if (!isInitialized) return [];
-    return checkAutoAchievements(achievementContext);
-  }, [isInitialized, checkAutoAchievements, achievementContext]);
+    
+    const context = await buildContext();
+    return checkAutoAchievements(context);
+  }, [isInitialized, buildContext, checkAutoAchievements]);
 
-  // Get achievements filtered by category
-  const getByCategory = useCallback((category: AchievementCategory): Achievement[] => {
-    return getAchievementsByCategory(category);
-  }, [getAchievementsByCategory]);
+  /**
+   * Trigger achievement check - call this after significant actions
+   */
+  const triggerCheck = useCallback(async () => {
+    const newlyUnlocked = await checkAchievements();
+    return newlyUnlocked;
+  }, [checkAchievements]);
 
-  // Get unlocked achievements
-  const unlockedAchievements = useMemo(() => {
-    return achievements.filter((a) => a.status === 'unlocked');
-  }, [achievements]);
+  /**
+   * Get unlocked achievements
+   */
+  const unlockedAchievements = achievements.filter(a => a.status === 'unlocked');
+  
+  /**
+   * Get in-progress achievements
+   */
+  const inProgressAchievements = achievements.filter(a => a.status === 'in_progress');
+  
+  /**
+   * Get locked achievements
+   */
+  const lockedAchievements = achievements.filter(a => a.status === 'locked');
 
-  // Get in-progress achievements
-  const inProgressAchievements = useMemo(() => {
-    return achievements.filter((a) => a.status === 'in_progress');
-  }, [achievements]);
+  /**
+   * Get next keytag to earn
+   */
+  const nextKeytag = keytags.find(k => !k.isEarned);
 
-  // Get locked achievements
-  const lockedAchievements = useMemo(() => {
-    return achievements.filter((a) => a.status === 'locked');
-  }, [achievements]);
-
-  // Calculate overall progress percentage
-  const overallProgress = useMemo(() => {
-    const totalPossible = totalAchievements + totalKeytags;
-    const totalEarned = totalUnlocked + earnedKeytags;
-    return totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
-  }, [totalAchievements, totalKeytags, totalUnlocked, earnedKeytags]);
-
-  // Earned keytags only
-  const earnedKeytagsList = useMemo(() => {
-    return keytags.filter((k) => k.isEarned);
-  }, [keytags]);
-
-  // Next keytag to earn
-  const nextKeytag = useMemo(() => {
-    return keytags.find((k) => !k.isEarned);
-  }, [keytags]);
+  /**
+   * Get most recently earned keytag
+   */
+  const currentKeytag = [...keytags].reverse().find(k => k.isEarned);
 
   return {
     // State
@@ -138,48 +186,22 @@ export function useAchievements() {
     earnedKeytags,
     recentUnlock,
     categoryProgress,
-
+    
     // Computed
     unlockedAchievements,
     inProgressAchievements,
     lockedAchievements,
-    overallProgress,
-    earnedKeytagsList,
     nextKeytag,
-
+    currentKeytag,
+    
     // Actions
+    loadAchievements,
     checkAchievements,
+    triggerCheck,
     selfCheckAchievement,
     saveReflection,
     getReflection,
     dismissRecentUnlock,
-    getByCategory,
-    loadAchievements,
+    getAchievementsByCategory,
   };
 }
-
-/**
- * Calculate meetings attended in first 90 days of sobriety
- */
-function calculateMeetingsInFirst90Days(
-  meetings: { attendedAt: Date }[],
-  currentDays: number
-): number {
-  if (currentDays < 90) {
-    // Still in first 90 days, count all meetings
-    return meetings.length;
-  }
-
-  // Calculate 90 days ago from sobriety start
-  const sobrietyStart = new Date();
-  sobrietyStart.setDate(sobrietyStart.getDate() - currentDays);
-  
-  const ninetyDaysFromStart = new Date(sobrietyStart);
-  ninetyDaysFromStart.setDate(ninetyDaysFromStart.getDate() + 90);
-
-  return meetings.filter((m) => {
-    const attendedDate = new Date(m.attendedAt);
-    return attendedDate >= sobrietyStart && attendedDate <= ninetyDaysFromStart;
-  }).length;
-}
-

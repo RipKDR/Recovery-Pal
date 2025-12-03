@@ -229,15 +229,15 @@ export default function EmergencyScreen() {
 
           {/* Quick Action Buttons */}
           <View className="flex-row gap-3 mb-4">
-            <QuickActionButton icon="clock" label="5 Minute Timer" onPress={() => {}} />
+            <QuickActionButton icon="clock" label="5 Minute Timer" onPress={() => router.push('/timer')} />
             <QuickActionButton icon="heart" label="Breathing Exercise" onPress={() => router.push('/breathing')} />
           </View>
           <View className="flex-row gap-3 mb-4">
-            <QuickActionButton icon="anchor" label="Grounding Techniques" onPress={() => {}} />
-            <QuickActionButton icon="sun" label="Mindfulness Pack" onPress={() => {}} />
+            <QuickActionButton icon="anchor" label="Grounding Techniques" onPress={() => router.push('/grounding')} />
+            <QuickActionButton icon="sun" label="Mindfulness Pack" onPress={() => router.push('/mindfulness')} />
           </View>
           <View className="flex-row gap-3 mb-6">
-            <QuickActionButton icon="file-text" label="Coping Strategies" onPress={() => {}} />
+            <QuickActionButton icon="file-text" label="Coping Strategies" onPress={() => router.push('/coping')} />
             <View className="flex-1" />
           </View>
 

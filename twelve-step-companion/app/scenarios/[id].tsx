@@ -1,6 +1,6 @@
 /**
  * Individual Scenario Practice Screen
- * Interactive choose-your-own-adventure style scenario
+ * Interactive choose-your-own-adventure style scenario with playbook integration
  */
 
 import React, { useState } from 'react';
@@ -13,7 +13,8 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, Href } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { Card, Button } from '../../components/ui';
 import { useScenarioStore } from '../../lib/store';
 import {
@@ -21,7 +22,45 @@ import {
   SCENARIO_CATEGORIES,
 } from '../../lib/constants/triggerScenarios';
 
-type Stage = 'scenario' | 'choice' | 'outcome' | 'reflection';
+type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
+
+// Playbook tools that can help in scenarios
+const PLAYBOOK_TOOLS: { id: string; title: string; icon: FeatherIconName; route: string; description: string }[] = [
+  { id: 'breathing', title: 'Breathing Exercise', icon: 'wind', route: '/breathing', description: 'Calm your nervous system' },
+  { id: 'grounding', title: '5-4-3-2-1 Grounding', icon: 'anchor', route: '/grounding', description: 'Get present in the moment' },
+  { id: 'timer', title: 'Urge Surfing Timer', icon: 'clock', route: '/timer', description: 'Wait out the craving' },
+  { id: 'coping', title: 'Coping Strategies', icon: 'book-open', route: '/coping', description: 'More tools to help' },
+  { id: 'mindfulness', title: 'Mindfulness Pack', icon: 'sun', route: '/mindfulness', description: 'Center yourself' },
+];
+
+type Stage = 'scenario' | 'choice' | 'outcome' | 'playbook' | 'reflection';
+
+// Playbook tool card
+function PlaybookToolCard({
+  tool,
+  onPress,
+}: {
+  tool: typeof PLAYBOOK_TOOLS[0];
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className="flex-row items-center gap-3 bg-navy-800/40 rounded-xl p-3 mb-2 border border-surface-700/30"
+      accessibilityRole="button"
+      accessibilityLabel={tool.title}
+    >
+      <View className="w-10 h-10 rounded-lg bg-primary-500/20 items-center justify-center">
+        <Feather name={tool.icon} size={20} color="#60a5fa" />
+      </View>
+      <View className="flex-1">
+        <Text className="text-white font-medium">{tool.title}</Text>
+        <Text className="text-surface-400 text-xs">{tool.description}</Text>
+      </View>
+      <Feather name="chevron-right" size={18} color="#64748b" />
+    </TouchableOpacity>
+  );
+}
 
 export default function ScenarioPracticeScreen() {
   const router = useRouter();
@@ -54,8 +93,16 @@ export default function ScenarioPracticeScreen() {
     setStage('outcome');
   };
 
+  const handleContinueToPlaybook = () => {
+    setStage('playbook');
+  };
+
   const handleContinueToReflection = () => {
     setStage('reflection');
+  };
+
+  const handleOpenTool = (route: string) => {
+    router.push(route as Href);
   };
 
   const handleComplete = async () => {
@@ -112,11 +159,11 @@ export default function ScenarioPracticeScreen() {
 
         {/* Progress */}
         <View className="flex-row gap-2 mb-6">
-          {['scenario', 'choice', 'outcome', 'reflection'].map((s, i) => (
+          {['scenario', 'choice', 'outcome', 'playbook', 'reflection'].map((s, i) => (
             <View
               key={s}
               className={`flex-1 h-1 rounded-full ${
-                ['scenario', 'choice', 'outcome', 'reflection'].indexOf(stage) >= i
+                ['scenario', 'choice', 'outcome', 'playbook', 'reflection'].indexOf(stage) >= i
                   ? 'bg-primary-500'
                   : 'bg-surface-200 dark:bg-surface-700'
               }`}
@@ -257,14 +304,108 @@ export default function ScenarioPracticeScreen() {
             )}
 
             <Button
-              title="Continue to Reflection"
-              onPress={handleContinueToReflection}
+              title="Open Recovery Playbook"
+              onPress={handleContinueToPlaybook}
               className="mb-4"
             />
 
             <TouchableOpacity onPress={handleTryAgain} className="py-3">
               <Text className="text-center text-primary-600">Try Different Choice</Text>
             </TouchableOpacity>
+          </>
+        )}
+
+        {/* Playbook Stage */}
+        {stage === 'playbook' && (
+          <>
+            <Text className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-4">
+              Recovery Playbook
+            </Text>
+
+            <Card variant="elevated" className="mb-6 bg-primary-50 dark:bg-primary-900/20">
+              <View className="flex-row items-start gap-3">
+                <Text className="text-2xl">🛠️</Text>
+                <View className="flex-1">
+                  <Text className="text-base font-medium text-primary-800 dark:text-primary-200">
+                    Tools for This Moment
+                  </Text>
+                  <Text className="text-sm text-primary-600 dark:text-primary-400">
+                    In a real situation like this, these tools can help you make healthy choices.
+                    Practice using them now so they're second nature when you need them.
+                  </Text>
+                </View>
+              </View>
+            </Card>
+
+            {/* Recommended tools based on scenario */}
+            <Text className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">
+              Recommended Tools
+            </Text>
+            
+            {PLAYBOOK_TOOLS.slice(0, 3).map((tool) => (
+              <PlaybookToolCard
+                key={tool.id}
+                tool={tool}
+                onPress={() => handleOpenTool(tool.route)}
+              />
+            ))}
+
+            <Text className="text-lg font-semibold text-surface-900 dark:text-surface-100 mt-4 mb-3">
+              More Tools
+            </Text>
+            
+            {PLAYBOOK_TOOLS.slice(3).map((tool) => (
+              <PlaybookToolCard
+                key={tool.id}
+                tool={tool}
+                onPress={() => handleOpenTool(tool.route)}
+              />
+            ))}
+
+            {/* Action plan */}
+            <Card variant="outlined" className="mt-4 mb-6">
+              <Text className="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">
+                Your Action Plan for This Scenario:
+              </Text>
+              <View className="gap-2">
+                <View className="flex-row items-start gap-2">
+                  <Text className="text-primary-500">1.</Text>
+                  <Text className="text-sm text-surface-600 dark:text-surface-400 flex-1">
+                    Recognize the trigger and pause before reacting
+                  </Text>
+                </View>
+                <View className="flex-row items-start gap-2">
+                  <Text className="text-primary-500">2.</Text>
+                  <Text className="text-sm text-surface-600 dark:text-surface-400 flex-1">
+                    Use a grounding or breathing technique to calm down
+                  </Text>
+                </View>
+                <View className="flex-row items-start gap-2">
+                  <Text className="text-primary-500">3.</Text>
+                  <Text className="text-sm text-surface-600 dark:text-surface-400 flex-1">
+                    Call your sponsor or support person
+                  </Text>
+                </View>
+                <View className="flex-row items-start gap-2">
+                  <Text className="text-primary-500">4.</Text>
+                  <Text className="text-sm text-surface-600 dark:text-surface-400 flex-1">
+                    Remove yourself from the situation if possible
+                  </Text>
+                </View>
+                <View className="flex-row items-start gap-2">
+                  <Text className="text-primary-500">5.</Text>
+                  <Text className="text-sm text-surface-600 dark:text-surface-400 flex-1">
+                    Play the tape forward - imagine the consequences of using
+                  </Text>
+                </View>
+              </View>
+            </Card>
+
+            <Button
+              title="Continue to Reflection"
+              onPress={handleContinueToReflection}
+              className="mb-4"
+            />
           </>
         )}
 
