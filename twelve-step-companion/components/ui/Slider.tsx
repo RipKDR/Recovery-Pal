@@ -1,6 +1,6 @@
 /**
  * Slider Component
- * Custom slider for mood/craving inputs with accessibility support
+ * Dark navy themed slider for mood/craving inputs with accessibility support
  */
 
 import React from 'react';
@@ -82,13 +82,13 @@ export function Slider({
       {(label || showValue) && (
         <View className="flex-row justify-between items-center mb-2">
           {label && (
-            <Text className="text-base font-medium text-surface-700 dark:text-surface-300">
+            <Text className="text-base font-medium text-surface-300">
               {label}
             </Text>
           )}
           {showValue && (
             <Text 
-              className="text-lg font-bold text-primary-600"
+              className="text-lg font-bold text-primary-400"
               accessibilityElementsHidden
             >
               {value}
@@ -100,7 +100,7 @@ export function Slider({
       {/* Slider Track */}
       <View className="relative h-8 mb-2">
         {/* Background Track */}
-        <View className="absolute top-3 left-0 right-0 h-2 bg-surface-200 dark:bg-surface-600 rounded-full" />
+        <View className="absolute top-3 left-0 right-0 h-2 bg-surface-700/50 rounded-full" />
         
         {/* Filled Track */}
         <View 
@@ -116,10 +116,10 @@ export function Slider({
               onPress={() => onValueChange(stepValue)}
               className={`w-8 h-8 rounded-full items-center justify-center ${
                 stepValue === value
-                  ? 'bg-primary-600'
+                  ? 'bg-primary-500'
                   : stepValue <= value
-                  ? 'bg-primary-300'
-                  : 'bg-surface-200 dark:bg-surface-600'
+                  ? 'bg-primary-500/60'
+                  : 'bg-surface-700/50'
               }`}
               accessibilityRole="button"
               accessibilityLabel={`Select ${stepValue}`}
@@ -143,8 +143,8 @@ export function Slider({
       {/* Min/Max Labels */}
       {(minLabel || maxLabel) && (
         <View className="flex-row justify-between">
-          <Text className="text-xs text-surface-400">{minLabel || ''}</Text>
-          <Text className="text-xs text-surface-400">{maxLabel || ''}</Text>
+          <Text className="text-xs text-surface-500">{minLabel || ''}</Text>
+          <Text className="text-xs text-surface-500">{maxLabel || ''}</Text>
         </View>
       )}
     </View>

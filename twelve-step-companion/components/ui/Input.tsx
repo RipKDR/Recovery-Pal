@@ -1,6 +1,6 @@
 /**
  * Input Component
- * Reusable text input with accessibility support
+ * Dark navy themed text input with accessibility support
  */
 
 import React from 'react';
@@ -26,8 +26,9 @@ export function Input({
   accessibilityHint,
   ...props
 }: InputProps) {
-  const baseInputStyles = 'bg-surface-100 dark:bg-surface-700 rounded-xl px-4 py-3 text-base text-surface-900 dark:text-surface-100';
-  const errorStyles = error ? 'border-2 border-red-500' : '';
+  // Dark navy theme styles
+  const baseInputStyles = 'bg-navy-800/40 rounded-xl px-4 py-3 text-base text-white border border-surface-700/30';
+  const errorStyles = error ? 'border-2 border-danger-500' : '';
 
   // Generate accessibility label from label prop if not provided
   const computedAccessibilityLabel = accessibilityLabel || label || props.placeholder;
@@ -36,7 +37,7 @@ export function Input({
     <View className={`${containerClassName}`}>
       {label && (
         <Text 
-          className="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1"
+          className="text-sm font-medium text-surface-300 mb-2"
           accessibilityRole="text"
         >
           {label}
@@ -44,7 +45,7 @@ export function Input({
       )}
       <TextInput
         className={`${baseInputStyles} ${errorStyles} ${className}`}
-        placeholderTextColor="#9ca3af"
+        placeholderTextColor="#64748b"
         accessibilityLabel={computedAccessibilityLabel}
         accessibilityHint={accessibilityHint || hint}
         accessibilityState={{
@@ -54,7 +55,7 @@ export function Input({
       />
       {error && (
         <Text 
-          className="text-sm text-red-500 mt-1"
+          className="text-sm text-danger-400 mt-1"
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
         >

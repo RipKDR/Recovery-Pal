@@ -104,7 +104,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
       if (data?.screen === 'checkin') {
         router.push('/checkin');
       } else if (data?.screen === 'progress') {
-        router.push('/(tabs)/progress');
+        router.push('/(tabs)/insights');
       }
     });
 
@@ -117,20 +117,20 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
 
   if (error) {
     return (
-      <View className="flex-1 items-center justify-center bg-surface-50 dark:bg-surface-900 p-6">
-        <View className="w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-900/30 items-center justify-center mb-6">
+      <View className="flex-1 items-center justify-center bg-navy-950 p-6">
+        <View className="w-20 h-20 rounded-full bg-amber-500/20 items-center justify-center mb-6">
           <Text className="text-4xl">⚠️</Text>
         </View>
-        <Text className="text-xl font-bold text-surface-900 dark:text-surface-100 text-center mb-2">
+        <Text className="text-xl font-bold text-white text-center mb-2">
           Unable to Start
         </Text>
-        <Text className="text-surface-600 dark:text-surface-400 text-center mb-6 px-4">
+        <Text className="text-surface-400 text-center mb-6 px-4">
           {error}
         </Text>
         <TouchableOpacity
           onPress={initialize}
           disabled={isRetrying}
-          className="bg-primary-600 rounded-xl px-8 py-4 mb-4"
+          className="bg-primary-500 rounded-xl px-8 py-4 mb-4"
           accessibilityRole="button"
           accessibilityLabel="Retry initialization"
         >
@@ -140,8 +140,8 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
             <Text className="text-white font-semibold text-lg">Try Again</Text>
           )}
         </TouchableOpacity>
-        <View className="mt-8 p-4 border border-red-200 dark:border-red-800 rounded-xl">
-          <Text className="text-red-600 dark:text-red-400 text-center font-semibold">
+        <View className="mt-8 p-4 border border-danger-500/30 rounded-xl bg-danger-500/10">
+          <Text className="text-danger-400 text-center font-semibold">
             🆘 Need Help? Call 988
           </Text>
           <Text className="text-surface-500 text-center text-sm mt-1">
@@ -154,7 +154,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
 
   if (!isReady) {
     return (
-      <View className="flex-1 items-center justify-center bg-primary-900">
+      <View className="flex-1 items-center justify-center bg-navy-950">
         <ActivityIndicator size="large" color="#60a5fa" />
         <Text className="text-white mt-4 text-lg">Loading...</Text>
       </View>
@@ -174,7 +174,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AppInitializer>
-          <StatusBar style="auto" />
+          <StatusBar style="light" />
           <Stack
             screenOptions={{
               headerShown: false,

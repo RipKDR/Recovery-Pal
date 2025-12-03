@@ -5,15 +5,14 @@
 
 import React, { useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import type { RelativePathString } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, Href } from 'expo-router';
 import { Card } from '../../components/ui';
 import { STEP_PROMPTS } from '../../lib/constants/stepPrompts';
 import { useJournalStore, useFourthStepStore, useAmendsStore, useTenthStepStore } from '../../lib/store';
 
 // Get progress indicator color based on journal entries
-function getStepProgress(step: number, entries: any[]): 'none' | 'started' | 'completed' {
+function getStepProgress(step: number, entries: { type: string; stepNumber?: number }[]): 'none' | 'started' | 'completed' {
   const stepEntries = entries.filter(
     (e) => e.type === 'step-work' && e.stepNumber === step
   );
@@ -224,7 +223,7 @@ export default function StepWorkIndexScreen() {
             return (
               <TouchableOpacity
                 key={tool.step}
-                onPress={() => router.push(tool.route as any)}
+                onPress={() => router.push(tool.route as Href)}
                 activeOpacity={0.7}
               >
                 <Card variant="default" className={`mb-3 ${tool.bgColor}`}>

@@ -1,19 +1,24 @@
 /**
  * Button Component
- * Reusable button with variants and accessibility support
+ * Dark navy themed buttons with blue accent
+ * Matches reference site design
  */
 
 import React from 'react';
 import { TouchableOpacity, Text, ActivityIndicator, View, AccessibilityRole } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+
+type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
   loading?: boolean;
-  icon?: React.ReactNode;
+  icon?: FeatherIconName;
+  iconPosition?: 'left' | 'right';
   className?: string;
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -28,6 +33,7 @@ export function Button({
   disabled = false,
   loading = false,
   icon,
+  iconPosition = 'left',
   className = '',
   accessibilityLabel,
   accessibilityHint,
@@ -35,20 +41,32 @@ export function Button({
 }: ButtonProps) {
   const baseStyles = 'flex-row items-center justify-center rounded-xl';
   
+  // Dark navy theme button variants
   const variantStyles = {
-    primary: 'bg-primary-600 active:bg-primary-700',
-    secondary: 'bg-secondary-600 active:bg-secondary-700',
-    outline: 'border-2 border-primary-600 bg-transparent',
-    ghost: 'bg-transparent',
-    danger: 'bg-red-600 active:bg-red-700',
+    primary: 'bg-primary-500 active:bg-primary-600',
+    secondary: 'bg-secondary-500 active:bg-secondary-600',
+    outline: 'border-2 border-primary-500 bg-transparent active:bg-primary-500/10',
+    ghost: 'bg-transparent active:bg-surface-700/30',
+    danger: 'bg-danger-500 active:bg-danger-600',
+    success: 'bg-success-500 active:bg-success-600',
   };
 
   const textVariantStyles = {
     primary: 'text-white',
     secondary: 'text-white',
-    outline: 'text-primary-600',
-    ghost: 'text-primary-600',
+    outline: 'text-primary-400',
+    ghost: 'text-primary-400',
     danger: 'text-white',
+    success: 'text-white',
+  };
+
+  const iconColors = {
+    primary: '#ffffff',
+    secondary: '#ffffff',
+    outline: '#60a5fa',
+    ghost: '#60a5fa',
+    danger: '#ffffff',
+    success: '#ffffff',
   };
 
   const sizeStyles = {
@@ -63,11 +81,27 @@ export function Button({
     lg: 'text-lg',
   };
 
+  const iconSizes = {
+    sm: 16,
+    md: 18,
+    lg: 20,
+  };
+
   const disabledStyles = disabled ? 'opacity-50' : '';
 
-  // Generate accessibility label if not provided
   const computedAccessibilityLabel = accessibilityLabel || title;
   const computedAccessibilityHint = accessibilityHint || (loading ? 'Loading, please wait' : undefined);
+
+  const renderIcon = () => {
+    if (!icon) return null;
+    return (
+      <Feather 
+        name={icon} 
+        size={iconSizes[size]} 
+        color={iconColors[variant]} 
+      />
+    );
+  };
 
   return (
     <TouchableOpacity
@@ -85,19 +119,20 @@ export function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' || variant === 'secondary' || variant === 'danger' ? '#fff' : '#2563eb'}
+          color={iconColors[variant]}
           size="small"
           accessibilityLabel="Loading"
         />
       ) : (
         <View className="flex-row items-center gap-2">
-          {icon}
+          {icon && iconPosition === 'left' && renderIcon()}
           <Text
             className={`font-semibold ${textVariantStyles[variant]} ${textSizeStyles[size]}`}
             accessibilityElementsHidden
           >
             {title}
           </Text>
+          {icon && iconPosition === 'right' && renderIcon()}
         </View>
       )}
     </TouchableOpacity>

@@ -1,12 +1,14 @@
 /**
  * Sobriety Counter Component
- * Large, prominent display of recovery duration with accessibility support
- * Phase 4: Optimized with React.memo
+ * Circular progress ring with stats - matches reference site design
  */
 
 import React, { memo, useMemo } from 'react';
-import { View, Text } from 'react-native';
-import { Card } from '../ui';
+import { View, Text, Dimensions } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 interface SobrietyCounterProps {
   days: number;
@@ -16,6 +18,77 @@ interface SobrietyCounterProps {
   className?: string;
 }
 
+// Circular progress ring component
+function CircularProgress({ 
+  progress, 
+  size = 180, 
+  strokeWidth = 12 
+}: { 
+  progress: number; 
+  size?: number; 
+  strokeWidth?: number;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (Math.min(progress, 1) * circumference);
+  
+  return (
+    <View style={{ width: size, height: size }}>
+      <Svg width={size} height={size}>
+        <Defs>
+          <LinearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0%" stopColor="#14b8a6" />
+            <Stop offset="100%" stopColor="#22c55e" />
+          </LinearGradient>
+        </Defs>
+        {/* Background circle */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgba(51, 65, 85, 0.4)"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+        />
+        {/* Progress circle */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="url(#progressGradient)"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+    </View>
+  );
+}
+
+// Stat item component
+function StatItem({ 
+  icon, 
+  value, 
+  label 
+}: { 
+  icon: React.ComponentProps<typeof Feather>['name']; 
+  value: string | number; 
+  label: string;
+}) {
+  return (
+    <View className="items-center flex-1">
+      <View className="flex-row items-center gap-1 mb-1">
+        <Feather name={icon} size={14} color="#64748b" />
+      </View>
+      <Text className="text-white text-xl font-bold">{value}</Text>
+      <Text className="text-surface-500 text-xs">{label}</Text>
+    </View>
+  );
+}
+
 export const SobrietyCounter = memo(function SobrietyCounter({
   days,
   hours = 0,
@@ -23,114 +96,100 @@ export const SobrietyCounter = memo(function SobrietyCounter({
   showDetailed = false,
   className = '',
 }: SobrietyCounterProps) {
-  // Calculate time units with memoization
-  const { years, months, daysInMonth } = useMemo(() => {
+  // Calculate time units
+  const { weeks, months, years } = useMemo(() => {
+    const w = Math.floor(days / 7);
+    const m = Math.floor(days / 30);
     const y = Math.floor(days / 365);
-    const remainingDays = days % 365;
-    const m = Math.floor(remainingDays / 30);
-    const d = remainingDays % 30;
-    return { years: y, months: m, daysInMonth: d };
+    return { weeks: w, months: m, years: y };
   }, [days]);
 
-  // Build accessibility label with memoization
+  // Calculate progress for circular indicator (based on current milestone progress)
+  const progress = useMemo(() => {
+    // Progress towards next milestone
+    const milestones = [1, 7, 14, 30, 60, 90, 180, 365, 730, 1095];
+    const nextMilestone = milestones.find(m => m > days) || days + 30;
+    const prevMilestone = [...milestones].reverse().find(m => m <= days) || 0;
+    return (days - prevMilestone) / (nextMilestone - prevMilestone);
+  }, [days]);
+
+  // Accessibility label
   const accessibilityLabel = useMemo(() => {
-    let label = `${days} ${days === 1 ? 'day' : 'days'} sober`;
-    
-    if (showDetailed && days > 0) {
-      const parts: string[] = [];
-      if (years > 0) parts.push(`${years} ${years === 1 ? 'year' : 'years'}`);
-      if (months > 0) parts.push(`${months} ${months === 1 ? 'month' : 'months'}`);
-      parts.push(`${daysInMonth} ${daysInMonth === 1 ? 'day' : 'days'}`);
-      label = parts.join(', ') + ' sober';
-    }
-    
-    // Add encouraging message
-    if (days === 0) label += '. Your journey begins now!';
-    else if (days === 1) label += '. One day at a time!';
-    else if (days < 7) label += '. Every day is a victory!';
-    else if (days < 30) label += '. Building momentum!';
-    else if (days < 90) label += '. Amazing progress!';
-    else label += '. You are an inspiration!';
-    
+    let label = `${days} ${days === 1 ? 'day' : 'days'} clean`;
+    if (weeks > 0) label += `, ${weeks} ${weeks === 1 ? 'week' : 'weeks'}`;
+    if (months > 0) label += `, approximately ${months} ${months === 1 ? 'month' : 'months'}`;
     return label;
-  }, [days, showDetailed, years, months, daysInMonth]);
+  }, [days, weeks, months]);
+
+  const circleSize = Math.min(screenWidth - 80, 200);
 
   return (
-    <Card 
-      variant="elevated" 
-      className={`items-center ${className}`}
+    <View 
+      className={`bg-navy-800/40 rounded-2xl p-4 border border-surface-700/30 ${className}`}
+      accessible
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="text"
     >
-      {/* Main counter */}
-      <View className="items-center" accessibilityElementsHidden>
-        <Text className="text-6xl font-bold text-primary-600 dark:text-primary-400">
-          {days}
-        </Text>
-        <Text className="text-xl text-surface-600 dark:text-surface-400 -mt-1">
-          {days === 1 ? 'day' : 'days'}
-        </Text>
+      {/* Header */}
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-row items-center gap-2">
+          <Feather name="clock" size={18} color="#60a5fa" />
+          <View>
+            <Text className="text-white font-semibold">Clean Time Streak</Text>
+            <Text className="text-surface-500 text-xs">Continuous, from your last reset</Text>
+          </View>
+        </View>
+        
+        {/* Streak Badge */}
+        <View className="flex-row items-center gap-1 bg-success-500/20 px-3 py-1.5 rounded-full">
+          <Feather name="zap" size={14} color="#4ade80" />
+          <Text className="text-success-400 text-xs font-medium">Streak Intact</Text>
+        </View>
       </View>
 
-      {/* Detailed breakdown */}
-      {showDetailed && days > 0 && (
-        <View className="flex-row mt-4 gap-4" accessibilityElementsHidden>
-          {years > 0 && (
-            <View className="items-center">
-              <Text className="text-2xl font-semibold text-secondary-600">
-                {years}
-              </Text>
-              <Text className="text-sm text-surface-500">
-                {years === 1 ? 'year' : 'years'}
-              </Text>
-            </View>
-          )}
-          {(months > 0 || years > 0) && (
-            <View className="items-center">
-              <Text className="text-2xl font-semibold text-secondary-600">
-                {months}
-              </Text>
-              <Text className="text-sm text-surface-500">
-                {months === 1 ? 'month' : 'months'}
-              </Text>
-            </View>
-          )}
-          <View className="items-center">
-            <Text className="text-2xl font-semibold text-secondary-600">
-              {daysInMonth}
-            </Text>
-            <Text className="text-sm text-surface-500">
-              {daysInMonth === 1 ? 'day' : 'days'}
+      {/* Circular Progress with Days */}
+      <View className="items-center py-4">
+        <View className="relative items-center justify-center">
+          <CircularProgress 
+            progress={progress} 
+            size={circleSize} 
+            strokeWidth={12}
+          />
+          <View className="absolute items-center">
+            <Feather name="award" size={24} color="#14b8a6" style={{ marginBottom: 4 }} />
+            <Text className="text-white text-5xl font-bold">{days}</Text>
+            <Text className="text-secondary-400 text-sm font-medium uppercase tracking-wider">
+              Days Clean
             </Text>
           </View>
         </View>
-      )}
-
-      {/* Hours and minutes (optional) */}
-      {showDetailed && (
-        <View className="flex-row mt-2 gap-2" accessibilityElementsHidden>
-          <Text className="text-sm text-surface-400">
-            {hours} hours, {minutes % 60} minutes
-          </Text>
-        </View>
-      )}
-
-      {/* Encouraging message */}
-      <View className="mt-4 bg-primary-50 dark:bg-primary-900/30 rounded-lg px-4 py-2" accessibilityElementsHidden>
-        <Text className="text-center text-primary-700 dark:text-primary-300 text-sm">
-          {days === 0
-            ? 'Your journey begins now 💪'
-            : days === 1
-            ? 'One day at a time 🌅'
-            : days < 7
-            ? 'Every day is a victory! ⭐'
-            : days < 30
-            ? 'Building momentum! 🚀'
-            : days < 90
-            ? 'Amazing progress! 🌟'
-            : 'You are an inspiration! 🎉'}
+        
+        {/* Encouraging message */}
+        <Text className="text-surface-400 text-sm text-center mt-4 px-4">
+          Every day clean is a victory worth celebrating.
         </Text>
       </View>
-    </Card>
+
+      {/* Stats Row */}
+      <View className="flex-row bg-navy-900/40 rounded-xl p-3 mt-2">
+        <StatItem 
+          icon="calendar" 
+          value={weeks} 
+          label="Weeks" 
+        />
+        <View className="w-px bg-surface-700/30" />
+        <StatItem 
+          icon="clock" 
+          value={`${months}`} 
+          label="Months est." 
+        />
+        <View className="w-px bg-surface-700/30" />
+        <StatItem 
+          icon="trending-up" 
+          value={days} 
+          label="Day streak" 
+        />
+      </View>
+    </View>
   );
 });

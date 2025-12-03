@@ -1,61 +1,73 @@
 /**
  * Tab Layout
- * Main tab navigation for the app with accessibility and theme support
+ * 6-tab navigation matching reference site design
+ * Home | Steps | Journal | Insights | Emergency | More
  */
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, useColorScheme } from 'react-native';
+import { View, Text, Platform } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 
-// Tab bar icons with accessibility labels
+type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
+
+// Tab configuration with icons
+const TAB_CONFIG: Record<string, { icon: FeatherIconName; label: string }> = {
+  index: { icon: 'home', label: 'Home' },
+  steps: { icon: 'book-open', label: 'Steps' },
+  journal: { icon: 'edit-3', label: 'Journal' },
+  insights: { icon: 'bar-chart-2', label: 'Insights' },
+  emergency: { icon: 'alert-circle', label: 'Emergency' },
+  more: { icon: 'more-horizontal', label: 'More' },
+};
+
+// Tab bar icon component
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
-  const icons: Record<string, string> = {
-    index: '🏠',
-    journal: '📝',
-    progress: '📊',
-    tools: '🧰',
-  };
-
-  const labels: Record<string, string> = {
-    index: 'Home',
-    journal: 'Journal',
-    progress: 'Progress',
-    tools: 'Tools',
-  };
-
+  const config = TAB_CONFIG[name] || { icon: 'circle', label: name };
+  const activeColor = '#3b82f6'; // primary blue
+  const inactiveColor = '#64748b'; // muted gray
+  
   return (
     <View className="items-center justify-center py-1">
-      <Text className="text-xl" accessibilityElementsHidden>{icons[name] || '•'}</Text>
+      <View
+        className={`p-2 rounded-xl ${focused ? 'bg-primary-500/20' : 'bg-transparent'}`}
+      >
+        <Feather
+          name={config.icon}
+          size={22}
+          color={focused ? activeColor : inactiveColor}
+        />
+      </View>
       <Text
-        className={`text-xs mt-0.5 ${
+        className={`text-xs mt-1 ${
           focused
-            ? 'text-primary-600 font-semibold'
+            ? 'text-primary-500 font-semibold'
             : 'text-surface-500'
         }`}
-        accessibilityElementsHidden
+        style={{ fontSize: 10 }}
       >
-        {labels[name] || name}
+        {config.label}
       </Text>
     </View>
   );
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: isDark ? '#1f2937' : '#ffffff',
-          borderTopColor: isDark ? '#374151' : '#e4e4e7',
-          height: 70,
-          paddingBottom: 8,
+          backgroundColor: '#0f172a', // Dark navy
+          borderTopColor: 'rgba(51, 65, 85, 0.5)',
+          borderTopWidth: 1,
+          height: Platform.OS === 'ios' ? 88 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
           paddingTop: 8,
         },
         tabBarShowLabel: false,
+        tabBarActiveTintColor: '#3b82f6',
+        tabBarInactiveTintColor: '#64748b',
       }}
     >
       <Tabs.Screen
@@ -67,6 +79,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="steps"
+        options={{
+          title: 'Steps',
+          tabBarIcon: ({ focused }) => <TabIcon name="steps" focused={focused} />,
+          tabBarAccessibilityLabel: 'Steps tab. Work through the 12 steps',
+        }}
+      />
+      <Tabs.Screen
         name="journal"
         options={{
           title: 'Journal',
@@ -75,19 +95,27 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="progress"
+        name="insights"
         options={{
-          title: 'Progress',
-          tabBarIcon: ({ focused }) => <TabIcon name="progress" focused={focused} />,
-          tabBarAccessibilityLabel: 'Progress tab. View your milestones and achievements',
+          title: 'Insights',
+          tabBarIcon: ({ focused }) => <TabIcon name="insights" focused={focused} />,
+          tabBarAccessibilityLabel: 'Insights tab. View mood analytics and patterns',
         }}
       />
       <Tabs.Screen
-        name="tools"
+        name="emergency"
         options={{
-          title: 'Tools',
-          tabBarIcon: ({ focused }) => <TabIcon name="tools" focused={focused} />,
-          tabBarAccessibilityLabel: 'Tools tab. Access recovery resources and exercises',
+          title: 'Emergency',
+          tabBarIcon: ({ focused }) => <TabIcon name="emergency" focused={focused} />,
+          tabBarAccessibilityLabel: 'Emergency tab. Access crisis resources and support',
+        }}
+      />
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: 'More',
+          tabBarIcon: ({ focused }) => <TabIcon name="more" focused={focused} />,
+          tabBarAccessibilityLabel: 'More tab. Additional tools and settings',
         }}
       />
     </Tabs>

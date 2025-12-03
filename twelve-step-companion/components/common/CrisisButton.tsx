@@ -12,9 +12,9 @@ import {
   Linking, 
   Modal,
   Pressable,
-  useColorScheme 
 } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { useSettingsStore } from '../../lib/store';
 import { getCrisisResources, type CrisisResource } from '../../lib/constants/crisisResources';
 
@@ -22,12 +22,10 @@ export function CrisisButton() {
   const [showQuickHelp, setShowQuickHelp] = useState(false);
   const router = useRouter();
   const segments = useSegments();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { settings } = useSettingsStore();
 
   // Get region-specific quick resources
-  const currentRegion = settings?.crisisRegion || 'US';
+  const currentRegion = settings?.crisisRegion || 'AU';
   const resources = getCrisisResources(currentRegion);
   const quickResources = resources.quickResources;
 
@@ -38,6 +36,7 @@ export function CrisisButton() {
     'emergency',
     '(auth)',
     'lock',
+    'scenarios',
   ];
   
   const shouldHide = hiddenPaths.some(path => currentPath.includes(path));
@@ -50,7 +49,7 @@ export function CrisisButton() {
 
   const handleGoToResources = () => {
     setShowQuickHelp(false);
-    router.push('/emergency');
+    router.push('/(tabs)/emergency');
   };
 
   const handleCallResource = (resource: CrisisResource) => {
@@ -76,8 +75,8 @@ export function CrisisButton() {
           elevation: 8,
         }}
       >
-        <View className="bg-red-600 rounded-full w-14 h-14 items-center justify-center border-2 border-red-400">
-          <Text className="text-2xl" accessibilityElementsHidden>🆘</Text>
+        <View className="bg-danger-500 rounded-full w-14 h-14 items-center justify-center border-2 border-danger-400">
+          <Feather name="alert-circle" size={28} color="#fff" />
         </View>
         {/* Pulse animation indicator */}
         <View 
@@ -90,7 +89,7 @@ export function CrisisButton() {
             elevation: 2,
           }}
         >
-          <View className="bg-red-500 rounded-full w-2 h-2" />
+          <View className="bg-danger-500 rounded-full w-2 h-2" />
         </View>
       </TouchableOpacity>
 
@@ -102,23 +101,23 @@ export function CrisisButton() {
         onRequestClose={() => setShowQuickHelp(false)}
       >
         <Pressable
-          className="flex-1 bg-black/60 justify-end"
+          className="flex-1 bg-black/70 justify-end"
           onPress={() => setShowQuickHelp(false)}
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
-            className={`${isDark ? 'bg-surface-800' : 'bg-white'} rounded-t-3xl p-6 pb-8`}
+            className="bg-navy-900 rounded-t-3xl p-6 pb-8 border-t border-surface-700/30"
           >
             {/* Header */}
             <View className="items-center mb-6">
-              <View className="w-12 h-1 bg-surface-300 dark:bg-surface-600 rounded-full mb-4" />
-              <Text className="text-xl font-bold text-surface-900 dark:text-surface-100">
+              <View className="w-12 h-1 bg-surface-600 rounded-full mb-4" />
+              <Text className="text-xl font-bold text-white">
                 Need Help Right Now?
               </Text>
-              <Text className="text-surface-500 text-center mt-1">
+              <Text className="text-surface-400 text-center mt-1">
                 You're not alone. Reach out immediately.
               </Text>
-              <Text className="text-surface-400 text-center text-xs mt-1">
+              <Text className="text-surface-500 text-center text-xs mt-1">
                 📍 {resources.name}
               </Text>
             </View>
@@ -142,7 +141,7 @@ export function CrisisButton() {
                       {resource.subtitle}
                     </Text>
                   </View>
-                  <Text className="text-white text-xl">→</Text>
+                  <Feather name="arrow-right" size={20} color="#fff" />
                 </TouchableOpacity>
               ))}
             </View>
@@ -154,7 +153,7 @@ export function CrisisButton() {
               accessibilityRole="button"
               accessibilityLabel="View all emergency resources"
             >
-              <Text className="text-primary-600 dark:text-primary-400 font-medium">
+              <Text className="text-primary-400 font-medium">
                 View All Resources →
               </Text>
             </TouchableOpacity>
@@ -172,8 +171,8 @@ export function CrisisButton() {
             </TouchableOpacity>
 
             {/* Safe messaging */}
-            <View className="mt-4 p-3 bg-surface-100 dark:bg-surface-700 rounded-lg">
-              <Text className="text-xs text-surface-500 dark:text-surface-400 text-center">
+            <View className="mt-4 p-3 bg-navy-800/50 rounded-lg border border-surface-700/30">
+              <Text className="text-xs text-surface-400 text-center">
                 💚 It takes courage to reach out. Whatever you're going through, help is available 24/7.
               </Text>
             </View>

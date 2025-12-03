@@ -91,7 +91,8 @@ export default function BreathingScreen() {
   useEffect(() => {
     if (!isActive || !selectedPattern) return;
 
-    let timeoutId: NodeJS.Timeout;
+    // Track all timeouts for proper cleanup
+    const timeoutIds: NodeJS.Timeout[] = [];
     let intervalId: NodeJS.Timeout;
 
     const runPhase = (phaseName: BreathingPhase, duration: number) => {
@@ -164,40 +165,41 @@ export default function BreathingScreen() {
 
       // Hold In (if any)
       if (holdIn > 0) {
-        timeoutId = setTimeout(() => {
+        timeoutIds.push(setTimeout(() => {
           clearInterval(intervalId);
           runPhase('hold-in', holdIn);
-        }, delay);
+        }, delay));
         delay += holdIn * 1000;
       }
 
       // Exhale
-      timeoutId = setTimeout(() => {
+      timeoutIds.push(setTimeout(() => {
         clearInterval(intervalId);
         runPhase('exhale', exhale);
-      }, delay);
+      }, delay));
       delay += exhale * 1000;
 
       // Hold Out (if any)
       if (holdOut > 0) {
-        timeoutId = setTimeout(() => {
+        timeoutIds.push(setTimeout(() => {
           clearInterval(intervalId);
           runPhase('hold-out', holdOut);
-        }, delay);
+        }, delay));
         delay += holdOut * 1000;
       }
 
       // Next cycle
-      timeoutId = setTimeout(() => {
+      timeoutIds.push(setTimeout(() => {
         clearInterval(intervalId);
         runCycle(cycleNum + 1);
-      }, delay);
+      }, delay));
     };
 
     runCycle(currentCycle);
 
     return () => {
-      clearTimeout(timeoutId);
+      // Clear ALL timeouts to prevent memory leaks
+      timeoutIds.forEach(id => clearTimeout(id));
       clearInterval(intervalId);
       if (animationRef.current) {
         animationRef.current.stop();

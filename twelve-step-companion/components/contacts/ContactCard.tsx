@@ -4,8 +4,8 @@
  * Memoized for FlatList performance
  */
 
-import React, { useState, memo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import React, { memo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, Alert, AlertButton } from 'react-native';
 import { Card } from '../ui';
 import { QuickCall } from './QuickCall';
 import type { RecoveryContact, ContactRole } from '../../lib/types';
@@ -35,7 +35,6 @@ function ContactCardComponent({
   onDelete,
   showActions = true,
 }: ContactCardProps) {
-  const [showMenu, setShowMenu] = useState(false);
 
   const getDaysSinceContact = useCallback((): string => {
     if (!contact.lastContactedAt) {
@@ -56,17 +55,12 @@ function ContactCardComponent({
 
   const handleLongPress = useCallback(() => {
     if (onEdit || onDelete) {
-      Alert.alert(
-        contact.name,
-        'What would you like to do?',
-        [
-          onEdit ? { text: 'Edit', onPress: onEdit } : null,
-          onDelete
-            ? { text: 'Delete', onPress: onDelete, style: 'destructive' }
-            : null,
-          { text: 'Cancel', style: 'cancel' },
-        ].filter(Boolean) as any[]
-      );
+      const buttons: AlertButton[] = [];
+      if (onEdit) buttons.push({ text: 'Edit', onPress: onEdit });
+      if (onDelete) buttons.push({ text: 'Delete', onPress: onDelete, style: 'destructive' });
+      buttons.push({ text: 'Cancel', style: 'cancel' });
+      
+      Alert.alert(contact.name, 'What would you like to do?', buttons);
     }
   }, [contact.name, onEdit, onDelete]);
 
@@ -136,6 +130,7 @@ export const ContactCard = memo(ContactCardComponent, (prevProps, nextProps) => 
     prevProps.contact.id === nextProps.contact.id &&
     prevProps.contact.name === nextProps.contact.name &&
     prevProps.contact.phone === nextProps.contact.phone &&
+    prevProps.contact.role === nextProps.contact.role &&
     prevProps.contact.lastContactedAt === nextProps.contact.lastContactedAt &&
     prevProps.showActions === nextProps.showActions &&
     prevProps.onCall === nextProps.onCall &&

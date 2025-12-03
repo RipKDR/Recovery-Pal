@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Card, Button } from '../../components/ui';
 import { useCapsuleStore } from '../../lib/store';
 
@@ -52,7 +52,7 @@ export default function NewCapsuleScreen() {
   const minDate = new Date();
   minDate.setDate(minDate.getDate() + 1); // At least tomorrow
 
-  const handleDateChange = (_: any, selectedDate?: Date) => {
+  const handleDateChange = (_: DateTimePickerEvent, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
       setUnlockDate(selectedDate);

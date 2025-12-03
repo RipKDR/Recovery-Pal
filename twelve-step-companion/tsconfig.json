@@ -9,8 +9,7 @@
       "@/*": [
         "./*"
       ]
-    },
-    "customConditions": ["expo"]
+    }
   },
   "include": [
     "**/*.ts",

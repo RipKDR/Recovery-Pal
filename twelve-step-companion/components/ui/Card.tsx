@@ -1,6 +1,7 @@
 /**
  * Card Component
- * Container with elevation and padding, with accessibility support
+ * Dark navy themed card with subtle borders
+ * Matches reference site design
  */
 
 import React from 'react';
@@ -9,7 +10,7 @@ import { View, Pressable, AccessibilityRole } from 'react-native';
 interface CardProps {
   children: React.ReactNode;
   onPress?: () => void;
-  variant?: 'default' | 'elevated' | 'outlined';
+  variant?: 'default' | 'elevated' | 'outlined' | 'glass';
   className?: string;
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -29,10 +30,16 @@ export function Card({
 }: CardProps) {
   const baseStyles = 'rounded-2xl p-4';
   
+  // Dark navy theme variants
   const variantStyles = {
-    default: 'bg-white dark:bg-surface-800',
-    elevated: 'bg-white dark:bg-surface-800 shadow-lg shadow-black/10',
-    outlined: 'bg-transparent border border-surface-200 dark:border-surface-700',
+    // Default semi-transparent dark card
+    default: 'bg-navy-800/40 border border-surface-700/30',
+    // Slightly more opaque for elevated content
+    elevated: 'bg-navy-800/60 border border-surface-700/40',
+    // Subtle border only
+    outlined: 'bg-transparent border border-surface-700/50',
+    // Glass effect with more transparency
+    glass: 'bg-navy-900/30 border border-surface-600/20',
   };
 
   const content = (
@@ -50,7 +57,7 @@ export function Card({
     return (
       <Pressable
         onPress={onPress}
-        className="active:opacity-90"
+        className="active:opacity-80"
         accessibilityRole={accessibilityRole || 'button'}
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={accessibilityHint}

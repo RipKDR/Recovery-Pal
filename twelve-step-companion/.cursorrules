@@ -1,366 +1,337 @@
-# Recovery Companion - Cursor AI Rules
-# CRITICAL: Read this entire file before ANY code generation
+# Cursor Rules for 12-Step Recovery Companion
 
-## IDENTITY
+## Project Overview
 
-You are a senior mobile architect specializing in **privacy-first mental health applications**.
-You are building a 12-step recovery companion app that prioritizes:
-1. User privacy above all else
-2. Compassionate, non-judgmental UX
-3. Offline-first functionality
-4. The BMAD (Before Making Any Decisions) methodology
+This is a **privacy-first 12-step recovery companion mobile app** built with React Native (Expo SDK 54+). All sensitive data is encrypted and stored on-device only. Zero server telemetry.
 
----
-
-## TECH STACK — LOCKED (DO NOT DEVIATE)
+## Tech Stack (LOCKED — Do Not Deviate)
 
 ```yaml
-Framework:        React Native via Expo SDK 52+
-Language:         TypeScript (strict mode, NO 'any' types)
-Navigation:       expo-router v4 (file-based routing)
-State Management: Zustand (lightweight, no boilerplate)
-Async State:      TanStack Query v5 (React Query)
-Database:         expo-sqlite with encryption
-Secure Storage:   expo-secure-store (biometric-protected keys)
-Auth:             Local biometric only (expo-local-authentication)
-UI Framework:     NativeWind v4 (TailwindCSS for RN)
-Icons:            lucide-react-native
-Notifications:    expo-notifications (local only)
-Audio:            expo-av (voice journals)
-Build:            EAS Build (cloud)
+Framework: React Native 0.81+ via Expo SDK 54
+Language: TypeScript (strict mode, no any)
+Navigation: expo-router v6 (file-based routing)
+State Management: Zustand v5
+Async State: TanStack Query v5
+Database: expo-sqlite (encrypted content)
+Encryption: expo-crypto + expo-secure-store
+Auth: Local biometric only (expo-local-authentication)
+UI Framework: NativeWind v4 (TailwindCSS for RN)
+Notifications: expo-notifications (local only)
+Audio: expo-av (voice journals)
+Build: EAS Build
 ```
 
-### NEVER Suggest These Alternatives
-- ❌ Redux, MobX, Jotai (use Zustand)
-- ❌ React Navigation standalone (use expo-router)
-- ❌ Styled Components, Emotion (use NativeWind)
-- ❌ WatermelonDB, Realm (use expo-sqlite)
-- ❌ Firebase, Supabase, AWS (NO cloud services)
-- ❌ AsyncStorage for sensitive data (use expo-secure-store)
-- ❌ Any analytics SDK (Amplitude, Mixpanel, etc.)
-- ❌ Any crash reporting that sends data (Sentry, Bugsnag)
-- ❌ Tamagui, UI Kitten (use NativeWind)
+## Directory Structure
 
----
-
-## PRIVACY GUARDRAILS — ABSOLUTE REQUIREMENTS
-
-### Data That NEVER Leaves the Device
-- Journal entries (all types)
-- Mood and craving scores
-- Meeting notes and reflections
-- Gratitude entries
-- Voice recordings
-- Milestone reflections
-- Motivation vault content
-- Time capsule content
-- Sobriety date and streaks
-- Any user-generated content
-
-### Forbidden Patterns (NEVER implement)
-```typescript
-// ❌ NEVER: Network calls for user data
-fetch('https://api.example.com/user-data', { body: userData });
-
-// ❌ NEVER: Analytics tracking
-analytics.track('journal_entry_created', { mood: 7 });
-
-// ❌ NEVER: Cloud storage
-await uploadToCloud(journalEntry);
-
-// ❌ NEVER: Server-side authentication
-await signInWithEmail(email, password);
-
-// ❌ NEVER: Remote logging of user behavior
-logger.info('User completed check-in', { userId, mood });
+```
+/app                     # expo-router file-based routing
+  /_layout.tsx           # Root layout (providers, auth gate)
+  /(auth)/               # Auth screens (lock, onboarding)
+  /(tabs)/               # Main tab screens
+  /[feature]/            # Feature-specific screens
+  
+/components              # Reusable UI components
+  /common/               # Shared patterns (ErrorBoundary, LoadingState, CrisisButton)
+  /ui/                   # Design system primitives (Button, Card, Input)
+  /[feature]/            # Feature-specific components
+  
+/lib                     # Core logic
+  /constants/            # Static data (prompts, readings, design tokens)
+  /db/                   # Database client and models
+  /encryption/           # Crypto operations
+  /hooks/                # Custom React hooks
+  /store/                # Zustand stores
+  /notifications/        # Notification utilities
+  /utils/                # Helper functions
+  /types.ts              # Shared TypeScript types
 ```
 
-### Required Patterns
-```typescript
-// ✅ ALWAYS: Local SQLite storage
-await db.insert(journalEntries).values(entry);
-
-// ✅ ALWAYS: Encrypted sensitive content
-const encrypted = await encrypt(content);
-await db.insert(journalEntries).values({ content: encrypted });
-
-// ✅ ALWAYS: Biometric protection for keys
-await SecureStore.setItemAsync(KEY, value, {
-  requireAuthentication: true,
-});
-
-// ✅ ALWAYS: Offline-first operations
-// No network dependency, ever
-```
-
----
-
-## UX PRINCIPLES — COMPASSIONATE RECOVERY DESIGN
-
-### Language Rules
-
-#### NEVER Use (Shame-Based)
-- "You broke your streak"
-- "Streak lost"
-- "You failed"
-- "Start over"
-- "Reset"
-- "Days wasted"
-- "Back to zero"
-- "You slipped"
-
-#### ALWAYS Use (Compassionate)
-- "Progress, not perfection"
-- "Every sober day counts"
-- "Your journey continues"
-- "Total days in recovery: X"
-- "You're still here, that matters"
-- "What did you learn?"
-- "How can we support you today?"
-- "Recovery isn't linear"
-
-### Relapse Handling
-When implementing relapse flows:
-
-```typescript
-// ❌ WRONG: Punitive UI
-<Text>Your 90-day streak is gone. Starting over at Day 0.</Text>
-
-// ✅ CORRECT: Compassionate UI
-<Text>Recovery isn't always linear. Your 90 days of growth still matter.</Text>
-<Text>Total days in recovery: 247</Text>
-<Text>What can we learn from this moment?</Text>
-```
-
-### Empty States
-```typescript
-// ❌ WRONG: Guilt-inducing
-<Text>You haven't journaled in 5 days. Don't give up!</Text>
-
-// ✅ CORRECT: Encouraging
-<Text>Ready to reflect? Your journal is here when you need it.</Text>
-```
-
-### Anti-Gamification
-- ❌ NO badges for streak lengths
-- ❌ NO leaderboards or comparisons
-- ❌ NO points or XP systems
-- ❌ NO achievement unlocks for quantity
-- ✅ YES meaningful milestone reflections
-- ✅ YES personal achievements (user-defined)
-- ✅ YES "keytags" that mirror real AA/NA keytags
-
-### Crisis Flow Requirements
-Emergency resources must be accessible in **under 5 seconds** from any screen.
-- Global CrisisButton FAB on all screens
-- Emergency at top of Tools screen
-- One-tap access to hotline numbers
-
----
-
-## BMAD METHODOLOGY — PHASE-GATED DEVELOPMENT
-
-### Before Writing ANY Code, Ask:
-1. What phase is this feature in? (P0/P1/P2/P3)
-2. Are all prerequisites complete?
-3. Does this align with privacy requirements?
-4. Is this the simplest solution?
-
-### Phase Definitions
-- **P0 (MVP)**: Core features, must ship
-- **P1 (v1.1)**: High value, 30-day horizon
-- **P2 (v1.2)**: Important, 60-day horizon  
-- **P3 (Backlog)**: Future consideration
-
-### Don't Skip Ahead
-If user asks for a P2 feature while P0 is incomplete:
-```
-"That's a great feature for v1.2! Let's first ensure the MVP foundation 
-is solid. Current priority: [P0 item]. Should we focus there first, or 
-would you like to discuss the P2 feature for future planning?"
-```
-
----
-
-## CODING STANDARDS
+## Code Style & Conventions
 
 ### TypeScript
+- Strict mode enabled, NO `any` types
+- Use explicit return types on functions
+- Prefer interfaces over types for object shapes
+- Use type imports: `import type { X } from 'module'`
+- Define DB types with snake_case (e.g., `DbJournalEntry`) and app types with camelCase
+
+### Component Patterns
+
 ```typescript
-// ✅ Strict typing, no 'any'
-interface JournalEntry {
-  id: string;
-  type: 'freeform' | 'step-work' | 'meeting-reflection' | 'daily-checkin';
-  content: string; // Encrypted
-  moodBefore?: number;
-  moodAfter?: number;
-  createdAt: Date;
+/**
+ * ComponentName
+ * Brief description of purpose
+ * Any performance notes (e.g., Memoized for FlatList)
+ */
+
+import React, { memo, useCallback } from 'react';
+import { View, Text } from 'react-native';
+
+interface ComponentNameProps {
+  // Props with JSDoc comments for complex ones
 }
 
-// ❌ Never do this
-const handleEntry = (entry: any) => { ... }
+function ComponentNameComponent({ prop1, prop2 }: ComponentNameProps) {
+  // Use useCallback for handlers passed to children
+  const handleAction = useCallback(() => {
+    // implementation
+  }, [dependencies]);
+
+  return (
+    <View className="flex-1">
+      {/* NativeWind classes for styling */}
+    </View>
+  );
+}
+
+// Memoize list item components for FlatList performance
+export const ComponentName = memo(ComponentNameComponent);
 ```
 
-### Component Patterns (NativeWind)
-```tsx
-// ✅ Correct: NativeWind className
-<View className="flex-1 bg-slate-900 p-4">
-  <Text className="text-2xl font-bold text-white">
-    Recovery Dashboard
-  </Text>
-</View>
+### Styling with NativeWind
+- Use Tailwind classes via `className` prop
+- Always support dark mode: `bg-white dark:bg-surface-800`
+- Use design token colors: `primary-*`, `secondary-*`, `surface-*`, `accent-*`
+- Follow 8px grid spacing: `p-4` (16px), `gap-3` (12px), `mb-6` (24px)
+- Touch targets minimum 44px: use `p-3` or `min-h-[44px]`
 
-// ❌ Wrong: StyleSheet
-<View style={styles.container}>
-  <Text style={styles.title}>Recovery Dashboard</Text>
-</View>
+### Color Palette
+```
+primary-*    # Blue (trust, calm, recovery) - main actions
+secondary-*  # Green (growth, healing) - success states  
+accent-*     # Warm yellow - highlights
+surface-*    # Neutral grays - backgrounds
 ```
 
-### Zustand Store Pattern
+### Zustand Stores
+
 ```typescript
-// ✅ Correct pattern
-interface JournalStore {
-  entries: JournalEntry[];
+/**
+ * Store Name
+ * Brief description
+ */
+
+import { create } from 'zustand';
+
+interface StoreNameState {
+  // State properties
+  items: Item[];
   isLoading: boolean;
   error: string | null;
   
   // Actions
-  addEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => Promise<void>;
-  updateEntry: (id: string, updates: Partial<JournalEntry>) => Promise<void>;
-  deleteEntry: (id: string) => Promise<void>;
-  loadEntries: () => Promise<void>;
+  loadItems: () => Promise<void>;
+  addItem: (item: Item) => Promise<void>;
 }
 
-export const useJournalStore = create<JournalStore>((set, get) => ({
-  entries: [],
+export const useStoreNameStore = create<StoreNameState>((set, get) => ({
+  items: [],
   isLoading: false,
   error: null,
-  
-  addEntry: async (entry) => {
+
+  loadItems: async () => {
+    set({ isLoading: true, error: null });
     try {
-      set({ isLoading: true, error: null });
-      // ... implementation
+      const items = await db.getItems();
+      set({ items, isLoading: false });
     } catch (error) {
-      set({ error: error.message });
-    } finally {
-      set({ isLoading: false });
+      set({ error: 'Failed to load items', isLoading: false });
     }
   },
-  // ...
 }));
 ```
 
-### Database Pattern (expo-sqlite)
+### Custom Hooks
+
 ```typescript
-// ✅ Correct: Using the existing db client
-import { db } from '@/lib/db';
+/**
+ * Hook Name
+ * Brief description of functionality
+ */
 
-// Insert with encryption
-const encryptedContent = await encrypt(content);
-await db.insert(journalEntries).values({
-  id: generateId(),
-  content: encryptedContent,
-  createdAt: new Date(),
-});
+import { useEffect, useCallback } from 'react';
+import { useStoreNameStore } from '../store';
+
+export function useHookName() {
+  const { items, loadItems, isLoading, error } = useStoreNameStore();
+
+  // Load data on mount
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
+
+  // Helper functions
+  const helperFunction = useCallback((param: Type): ReturnType => {
+    // implementation
+  }, []);
+
+  return {
+    items,
+    isLoading,
+    error,
+    helperFunction,
+  };
+}
 ```
 
-### Accessibility Requirements
-```tsx
-// ✅ Every interactive element needs:
+## Privacy Requirements (Non-Negotiable)
+
+- ALL journal content encrypted via expo-crypto
+- Encryption keys protected by biometrics (expo-secure-store)
+- NO server-side storage of ANY user content
+- NO analytics without explicit consent
+- NO required account creation
+- Full offline functionality
+- Data export capability (user owns their data)
+- Complete data deletion option
+
+## UX Guidelines
+
+### Anti-Patterns to AVOID
+- ❌ Shame-based messaging after relapse
+- ❌ "Streak lost" punitive UI
+- ❌ Required social features
+- ❌ Aggressive notification nagging
+- ❌ Gamification that trivializes recovery
+- ❌ Generic motivational quotes over personal content
+- ❌ Comparison to other users
+
+### Patterns to EMBRACE
+- ✅ "Progress not perfection" messaging
+- ✅ Celebrate total sober days (not just current streak)
+- ✅ Compassionate relapse handling
+- ✅ Personal motivation over generic content
+- ✅ User controls notification frequency
+- ✅ Meaningful achievements (not badges)
+- ✅ Reflection over gamification
+
+## Accessibility Requirements
+
+- All interactive elements need `accessibilityLabel` and `accessibilityRole`
+- Minimum touch targets: 44x44 pixels
+- Support screen readers (TalkBack/VoiceOver)
+- High contrast color combinations
+- Clear focus indicators
+- Meaningful error messages
+
+```typescript
 <TouchableOpacity
-  accessibilityLabel="Add new journal entry"
+  onPress={handleAction}
   accessibilityRole="button"
-  accessibilityHint="Opens the journal entry form"
-  onPress={handlePress}
+  accessibilityLabel="Call sponsor"
+  accessibilityHint="Opens phone dialer to call your sponsor"
+  className="min-h-[44px] min-w-[44px]"
 >
-  <PlusIcon />
-</TouchableOpacity>
-
-// ❌ Never ship without accessibility
-<TouchableOpacity onPress={handlePress}>
-  <PlusIcon />
-</TouchableOpacity>
 ```
 
----
+## Database Patterns
 
-## PROJECT STRUCTURE
+### Type Conversions
+- DB uses snake_case: `created_at`, `mood_before`
+- App uses camelCase: `createdAt`, `moodBefore`
+- SQLite booleans are 0/1, convert to boolean in app
+- Dates stored as ISO strings, convert to Date objects
 
+### Encrypted Fields
+Fields marked as `EncryptedString` in types must be:
+- Encrypted before save: `await encrypt(content)`
+- Decrypted after read: `await decrypt(encryptedContent)`
+
+## Testing
+
+- Unit tests for encryption utilities
+- Integration tests for database operations
+- Component tests with React Native Testing Library
+- Mock expo modules in jest.setup.js
+
+## File Naming
+
+- Components: PascalCase (`ContactCard.tsx`)
+- Hooks: camelCase with `use` prefix (`useJournal.ts`)
+- Stores: camelCase with `Store` suffix (`journalStore.ts`)
+- Constants: camelCase (`dailyReadings.ts`)
+- Types: PascalCase for types, `Db` prefix for database types
+
+## Import Order
+
+1. React and React Native
+2. Expo modules
+3. Third-party libraries
+4. Local components (absolute paths via `@/`)
+5. Local hooks and stores
+6. Types (using `import type`)
+
+```typescript
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Card } from '../ui';
+import { useJournal } from '../../lib/hooks';
+import type { JournalEntry } from '../../lib/types';
 ```
-twelve-step-companion/
-├── app/                      # expo-router screens
-│   ├── (auth)/              # Auth gate (lock screen)
-│   ├── (tabs)/              # Main tab navigation
-│   ├── journal/             # Journal screens
-│   ├── onboarding/          # First-time setup
-│   ├── settings/            # App settings
-│   ├── step-work/           # 12-step work modules
-│   └── vault/               # Motivation vault
-├── components/
-│   ├── common/              # Shared (ErrorBoundary, CrisisButton)
-│   ├── journal/             # Journal components
-│   ├── progress/            # SobrietyCounter, charts
-│   └── ui/                  # Design system (Button, Card, Input)
-├── lib/
-│   ├── constants/           # App constants, prompts
-│   ├── db/                  # SQLite client, models
-│   ├── encryption/          # Crypto utilities
-│   ├── hooks/               # Custom React hooks
-│   ├── store/               # Zustand stores
-│   └── utils/               # Utility functions
-└── md/                      # Documentation
+
+## Common Patterns
+
+### Loading States
+```typescript
+if (isLoading) {
+  return <LoadingState message="Loading entries..." />;
+}
 ```
 
----
+### Error States
+```typescript
+if (error) {
+  return <EmptyState icon="⚠️" title="Error" message={error} />;
+}
+```
 
-## CURRENT STATUS
+### Empty States
+```typescript
+if (items.length === 0) {
+  return (
+    <EmptyState
+      icon="📝"
+      title="No entries yet"
+      message="Your journal entries will appear here"
+      actionLabel="Write First Entry"
+      onAction={() => router.push('/journal/new')}
+    />
+  );
+}
+```
 
-**Phase 4 COMPLETE** - App is feature-complete and ready for production release.
+### Confirmation Dialogs
+```typescript
+const confirmDelete = useCallback(() => {
+  Alert.alert(
+    'Delete Entry',
+    'Are you sure? This cannot be undone.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: handleDelete },
+    ]
+  );
+}, [handleDelete]);
+```
 
-### Completed
-- [x] Biometric lock screen
-- [x] Onboarding flow
-- [x] Dashboard with sobriety counter
-- [x] Journaling (freeform, step work, voice)
-- [x] Daily check-in with notifications
-- [x] Progress tracking with milestones
-- [x] Tools screen with all features
-- [x] Motivation vault with biometric
-- [x] Time capsules
-- [x] Trigger scenarios
-- [x] Data export/import
-- [x] Data deletion with confirmation
-- [x] Accessibility labels
-- [x] Error boundaries
-- [x] Crisis FAB
+## Performance Guidelines
 
-### Pending
-- [ ] EAS production build
-- [ ] App store submission
+- Memoize FlatList item components with `React.memo()`
+- Use `useCallback` for handlers passed as props
+- Avoid inline object/array creation in render
+- Use `keyExtractor` with stable IDs for lists
+- Keep component tree shallow where possible
 
----
+## Crisis Button
 
-## RESPONSE CHECKLIST
+The `CrisisButton` component is a floating action button that appears on all screens. It provides quick access to crisis resources. Never remove or hide this button.
 
-Before generating ANY code, verify:
+## Notes for AI Assistant
 
-- [ ] Does this respect user privacy? (No network calls, no analytics)
-- [ ] Is sensitive data encrypted?
-- [ ] Does UI messaging avoid shame/guilt language?
-- [ ] Are accessibility labels included?
-- [ ] Does this use the correct tech stack?
-- [ ] Is this the simplest solution?
-- [ ] Does this fit the current phase priority?
-
----
-
-## REMEMBER
-
-> This app serves people in recovery from addiction. Every design decision
-> should ask: "Does this support someone having their worst day?"
-> 
-> Privacy isn't a feature—it's a promise. Users trust us with their most
-> vulnerable moments. Never betray that trust.
->
-> Progress, not perfection. The app should embody this principle in every
-> interaction.
-
+- When generating code, follow the established patterns in the codebase
+- Prioritize user privacy and data security
+- Use compassionate language in user-facing strings
+- Maintain offline-first architecture
+- Test edge cases for encrypted content handling
+- Consider accessibility in all UI decisions
