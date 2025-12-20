@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, LayoutAnimation, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Href } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -15,10 +15,12 @@ import { useCheckin } from '../../lib/hooks/useCheckin';
 import { useJournalStore, useRhythmStore } from '../../lib/store';
 import type { PulseContext, TinyInventory } from '../../lib/store/rhythmStore';
 import { STEP_PROMPTS } from '../../lib/constants/stepPrompts';
+import PromptModal from '../../components/common/PromptModal';
 
 // Note: LayoutAnimation.configureNext still works but setLayoutAnimationEnabledExperimental
 // is a no-op in New Architecture (which is enabled in this app)
 
+// Use Feather's native name type so TS accepts icon strings used in this file.
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
 
 // Shortcut card component
@@ -122,6 +124,19 @@ function IntentionSelector({
   const intentions = ['Stay Clean', 'Stay Connected', 'Be Gentle with Myself'];
   const [customMode, setCustomMode] = useState(false);
   const [customIntention, setCustomIntention] = useState('');
+  const [showCustomModal, setShowCustomModal] = useState(false);
+
+  const handleCustomSubmit = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setShowCustomModal(false);
+      return;
+    }
+    setCustomIntention(trimmed);
+    setCustomMode(true);
+    onSelect(trimmed);
+    setShowCustomModal(false);
+  };
   
   return (
     <View>
@@ -152,7 +167,7 @@ function IntentionSelector({
         <TouchableOpacity 
           onPress={() => {
             setCustomMode(true);
-            onSelect(customIntention || '');
+            setShowCustomModal(true);
           }}
           className={`px-3 py-2 rounded-lg border ${
             customMode ? 'bg-primary-500/20 border-primary-500' : 'border-surface-600/50'
@@ -169,24 +184,7 @@ function IntentionSelector({
             <Text 
               className="text-white"
               onPress={() => {
-                Alert.prompt(
-                  'Custom Intention',
-                  'What is your intention for today?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Set', 
-                      onPress: (text: string | undefined) => {
-                        if (text) {
-                          setCustomIntention(text);
-                          onSelect(text || '');
-                        }
-                      }
-                    }
-                  ],
-                  'plain-text',
-                  customIntention
-                );
+                setShowCustomModal(true);
               }}
             >
               {customIntention || 'Tap to enter your intention...'}
@@ -201,6 +199,17 @@ function IntentionSelector({
         variant="outline"
         icon="check"
         disabled={!selectedIntention || isSaving}
+      />
+
+      <PromptModal
+        visible={showCustomModal}
+        title="Custom Intention"
+        description="Set a personal intention for today."
+        initialValue={customIntention}
+        placeholder="I will focus on..."
+        confirmLabel="Set Intention"
+        onSubmit={handleCustomSubmit}
+        onCancel={() => setShowCustomModal(false)}
       />
     </View>
   );
@@ -454,9 +463,6 @@ function TinyInventoryForm({
 }
 
 export default function DashboardScreen() {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:458',message:'DashboardScreen rendering',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   const router = useRouter();
   const {
     profile,
@@ -465,18 +471,9 @@ export default function DashboardScreen() {
     soberMinutes,
     isLoading: sobrietyLoading,
   } = useSobriety();
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:466',message:'useSobriety hook result',data:{hasProfile:!!profile,soberDays,isLoading:sobrietyLoading,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
 
   const { hasCheckedInToday, submitCheckin } = useCheckin();
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:468',message:'useCheckin hook result',data:{hasCheckedInToday,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   const { entries } = useJournalStore();
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:469',message:'useJournalStore hook result',data:{entriesCount:entries?.length||0,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   
   // Rhythm store
   const {
@@ -489,15 +486,9 @@ export default function DashboardScreen() {
     submitPulseCheck,
     submitTinyInventory,
   } = useRhythmStore();
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:481',message:'useRhythmStore hook result',data:{hasIntention:!!todayIntention,hasInventory:!!todayInventory,pulseChecksCount:todayPulseChecks?.length||0,isLoading:rhythmLoading,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   
   // Load rhythm data on mount
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/index.tsx:485',message:'Loading today rhythm data',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'render',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     loadTodayRhythm();
   }, []);
   

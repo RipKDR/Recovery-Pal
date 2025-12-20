@@ -129,7 +129,11 @@ export default function WeeklyReportScreen() {
           totalQuestions: p.totalQuestions,
         })),
         achievements.map(a => ({ id: a.id, title: a.title, unlockedAt: a.unlockedAt })),
-        keytags,
+        keytags.map(kt => ({
+          name: kt.title,
+          daysRequired: kt.days,
+          isEarned: kt.isEarned,
+        })),
         sponsor?.lastContactedAt
       );
       setReport(generatedReport);

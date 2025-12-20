@@ -1,21 +1,43 @@
 /**
  * Notification Service
  * Handles scheduling and managing daily check-in reminders
+ *
+ * Note: We lazily require expo-notifications to avoid SSR/web build crashes
+ * when localStorage is not available during server-side rendering.
  */
 
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import type * as NotificationsTypes from 'expo-notifications';
 
-// Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof NotificationsTypes;
+
+let notificationsModule: NotificationsModule | null = null;
+let handlerConfigured = false;
+
+function getNotifications(): NotificationsModule {
+  if (!notificationsModule) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('expo-notifications');
+    notificationsModule = mod;
+  }
+  // Narrow type from NotificationsModule | null to NotificationsModule
+  return notificationsModule as NotificationsModule;
+}
+
+function ensureNotificationHandler(): void {
+  if (handlerConfigured) return;
+  const Notifications = getNotifications();
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+  handlerConfigured = true;
+}
 
 // Notification identifiers
 const DAILY_CHECKIN_NOTIFICATION_ID = 'daily-checkin-reminder';
@@ -30,6 +52,8 @@ const REGULAR_MEETING_REMINDER_PREFIX = 'regular-meeting-';
  * @returns true if permissions granted
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 
@@ -67,6 +91,8 @@ export async function requestNotificationPermissions(): Promise<boolean> {
  * @param checkInTime - Time in HH:mm format (e.g., "09:00")
  */
 export async function scheduleDailyCheckinReminder(checkInTime: string): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   // Cancel existing daily reminder first
   await cancelDailyCheckinReminder();
 
@@ -74,7 +100,7 @@ export async function scheduleDailyCheckinReminder(checkInTime: string): Promise
   const [hours, minutes] = checkInTime.split(':').map(Number);
 
   // Create a trigger for daily repeating notification
-  const trigger: Notifications.NotificationTriggerInput = {
+  const trigger: NotificationsTypes.NotificationTriggerInput = {
     type: Notifications.SchedulableTriggerInputTypes.DAILY,
     hour: hours,
     minute: minutes,
@@ -111,6 +137,8 @@ export async function scheduleDailyCheckinReminder(checkInTime: string): Promise
  * Cancel the daily check-in reminder
  */
 export async function cancelDailyCheckinReminder(): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   await Notifications.cancelScheduledNotificationAsync(DAILY_CHECKIN_NOTIFICATION_ID);
 }
 
@@ -123,6 +151,8 @@ export async function scheduleMilestoneNotification(
   title: string,
   days: number
 ): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   const messages = [
     `🎉 Incredible! You've reached ${title}!`,
     `🏆 ${days} days! You're an inspiration!`,
@@ -150,6 +180,8 @@ export async function scheduleMilestoneNotification(
 export async function scheduleMeetingReminder(
   daysSinceLastMeeting: number
 ): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   // Cancel existing meeting reminder first
   await cancelMeetingReminder();
 
@@ -199,6 +231,8 @@ export async function scheduleMeetingReminder(
  * Cancel meeting reminder
  */
 export async function cancelMeetingReminder(): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   await Notifications.cancelScheduledNotificationAsync(MEETING_REMINDER_NOTIFICATION_ID);
 }
 
@@ -207,6 +241,8 @@ export async function cancelMeetingReminder(): Promise<void> {
  * @param moodImprovement - The mood change after the meeting
  */
 export async function sendMeetingEncouragement(moodImprovement: number): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   if (moodImprovement > 0) {
     await Notifications.scheduleNotificationAsync({
       identifier: 'meeting-encouragement',
@@ -235,6 +271,8 @@ export async function scheduleTimeCapsuleNotification(
   title: string,
   unlockDate: Date
 ): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   // Don't schedule if unlock date is in the past
   if (unlockDate <= new Date()) return;
 
@@ -260,6 +298,8 @@ export async function scheduleTimeCapsuleNotification(
  * Cancel a time capsule notification
  */
 export async function cancelTimeCapsuleNotification(capsuleId: string): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   await Notifications.cancelScheduledNotificationAsync(
     `${TIME_CAPSULE_NOTIFICATION_PREFIX}${capsuleId}`
   );
@@ -269,13 +309,17 @@ export async function cancelTimeCapsuleNotification(capsuleId: string): Promise<
  * Cancel all scheduled notifications
  */
 export async function cancelAllNotifications(): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
 /**
  * Get all scheduled notifications (for debugging)
  */
-export async function getScheduledNotifications(): Promise<Notifications.NotificationRequest[]> {
+export async function getScheduledNotifications(): Promise<NotificationsTypes.NotificationRequest[]> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   return await Notifications.getAllScheduledNotificationsAsync();
 }
 
@@ -283,6 +327,8 @@ export async function getScheduledNotifications(): Promise<Notifications.Notific
  * Clear badge count
  */
 export async function clearBadge(): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   await Notifications.setBadgeCountAsync(0);
 }
 
@@ -291,8 +337,10 @@ export async function clearBadge(): Promise<void> {
  * Call this in app root to handle notification taps
  */
 export function addNotificationResponseListener(
-  handler: (response: Notifications.NotificationResponse) => void
-): Notifications.Subscription {
+  handler: (response: NotificationsTypes.NotificationResponse) => void
+): NotificationsTypes.Subscription {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   return Notifications.addNotificationResponseReceivedListener(handler);
 }
 
@@ -301,8 +349,10 @@ export function addNotificationResponseListener(
  * Called when notification is received while app is in foreground
  */
 export function addNotificationReceivedListener(
-  handler: (notification: Notifications.Notification) => void
-): Notifications.Subscription {
+  handler: (notification: NotificationsTypes.Notification) => void
+): NotificationsTypes.Subscription {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   return Notifications.addNotificationReceivedListener(handler);
 }
 
@@ -314,6 +364,7 @@ export async function initializeNotifications(
   enabled: boolean,
   checkInTime: string
 ): Promise<void> {
+  ensureNotificationHandler();
   if (enabled) {
     const hasPermission = await requestNotificationPermissions();
     if (hasPermission) {
@@ -334,6 +385,8 @@ export async function initializeNotifications(
 export async function scheduleAchievementNotification(
   achievement: { id: string; title: string; description: string; icon: string }
 ): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   await Notifications.scheduleNotificationAsync({
     identifier: `${ACHIEVEMENT_NOTIFICATION_PREFIX}${achievement.id}`,
     content: {
@@ -362,6 +415,8 @@ export async function scheduleRegularMeetingReminder(
   time: string,
   reminderMinutes: number = 30
 ): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   // Cancel existing reminder for this meeting
   await cancelRegularMeetingReminder(meetingId);
 
@@ -380,7 +435,7 @@ export async function scheduleRegularMeetingReminder(
   }
 
   // Create weekly trigger
-  const trigger: Notifications.NotificationTriggerInput = {
+  const trigger: NotificationsTypes.NotificationTriggerInput = {
     type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
     weekday: dayOfWeek + 1, // expo-notifications uses 1-7 (Sunday = 1)
     hour: reminderHour,
@@ -405,6 +460,8 @@ export async function scheduleRegularMeetingReminder(
  * Cancel a regular meeting reminder
  */
 export async function cancelRegularMeetingReminder(meetingId: string): Promise<void> {
+  ensureNotificationHandler();
+  const Notifications = getNotifications();
   await Notifications.cancelScheduledNotificationAsync(
     `${REGULAR_MEETING_REMINDER_PREFIX}${meetingId}`
   );

@@ -3,7 +3,7 @@
  * Uses jest-expo preset for React Native/Expo compatibility
  */
 
-module.exports = {
+const config = {
   preset: 'jest-expo',
   
   // Setup files to run before tests
@@ -73,10 +73,8 @@ module.exports = {
   // Verbose output
   verbose: true,
   
-  // Test environment
-  testEnvironment: 'node',
-  
   // Module file extensions
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
 };
 
+export default config;

@@ -8,7 +8,7 @@ export { useJournal } from './useJournal';
 export { useCheckin } from './useCheckin';
 export { useNotifications } from './useNotifications';
 export { useMeetings } from './useMeetings';
-export { useAudioRecorder } from './useAudioRecorder';
+export { useVoiceRecorder } from './useAudioRecorder';
 
 // V2 Hooks
 export { useContacts } from './useContacts';

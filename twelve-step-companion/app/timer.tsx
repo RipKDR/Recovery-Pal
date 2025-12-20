@@ -36,7 +36,7 @@ export default function TimerScreen() {
   const [isComplete, setIsComplete] = useState(false);
   const [encouragement, setEncouragement] = useState('');
   
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
   const appStateRef = useRef(AppState.currentState);
 

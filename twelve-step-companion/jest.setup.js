@@ -104,6 +104,15 @@ jest.mock('expo-audio', () => {
     record: jest.fn(() => Promise.resolve()),
     pause: jest.fn(() => Promise.resolve()),
     stop: jest.fn(() => Promise.resolve()),
+    uri: 'file:///mock/recording.m4a',
+    getStatus: jest.fn(() => ({
+      canRecord: true,
+      isRecording: false,
+      durationMillis: 0,
+      mediaServicesDidReset: false,
+      metering: 0,
+      url: 'file:///mock/recording.m4a',
+    })),
     getURI: jest.fn(() => 'file:///mock/recording.m4a'),
     remove: jest.fn(() => Promise.resolve()),
   };
@@ -120,14 +129,19 @@ jest.mock('expo-audio', () => {
     useAudioPlayer: jest.fn(() => mockPlayer),
     useAudioRecorderState: jest.fn(() => ({
       isRecording: false,
-      isPaused: false,
       durationMillis: 0,
+      metering: 0,
+      canRecord: true,
+      mediaServicesDidReset: false,
+      url: 'file:///mock/recording.m4a',
     })),
-    useAudioPlayerState: jest.fn(() => ({
-      isPlaying: false,
+    useAudioPlayerStatus: jest.fn(() => ({
+      playing: false,
       currentTime: 0,
       duration: 0,
       didJustFinish: false,
+      loop: false,
+      isBuffering: false,
     })),
     AudioModule: {
       requestRecordingPermissionsAsync: jest.fn(() =>

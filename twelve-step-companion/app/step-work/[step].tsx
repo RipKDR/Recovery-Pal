@@ -37,7 +37,8 @@ export default function StepDetailScreen() {
   const [showCompletion, setShowCompletion] = useState(false);
 
   // Animation
-  const fadeAnim = new Animated.Value(1);
+  // Keep a stable animated value across renders for smooth fades
+  const fadeAnim = React.useRef(new Animated.Value(1)).current;
 
   // Get previous step entries
   const previousEntries = entries.filter(

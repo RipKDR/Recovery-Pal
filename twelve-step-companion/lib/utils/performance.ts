@@ -8,7 +8,7 @@
  * - List rendering optimization
  */
 
-import { useCallback, useRef, useMemo, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 
 /**
  * Debounce a function call
@@ -18,7 +18,7 @@ export function useDebounce<T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number
 ): T {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<number | null>(null);
   const callbackRef = useRef(callback);
 
   // Update the callback ref when callback changes
@@ -125,9 +125,6 @@ export function useLazyLoad<T>(
 
   return { data, isLoading, error, reload: load };
 }
-
-// Need to import useState for useLazyLoad
-import { useState } from 'react';
 
 /**
  * Calculate optimal batch size for list rendering

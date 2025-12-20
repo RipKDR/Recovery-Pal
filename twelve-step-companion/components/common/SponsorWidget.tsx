@@ -9,7 +9,6 @@ import { Card } from '../ui';
 import { useContacts } from '../../lib/hooks/useContacts';
 import { usePhoneCalls } from '../../lib/hooks/usePhoneCalls';
 import { sendSOSMessage, makePhoneCall, openMessagingApp, SOS_MESSAGE } from '../../lib/utils/sms';
-import type { RecoveryContact } from '../../lib/types';
 
 interface SponsorWidgetProps {
   className?: string;
@@ -17,7 +16,7 @@ interface SponsorWidgetProps {
 }
 
 export function SponsorWidget({ className = '', compact = false }: SponsorWidgetProps) {
-  const { sponsor, loadContacts, callContact, markContacted } = useContacts();
+  const { sponsor, loadContacts, markContacted } = useContacts();
   const { logCallWithContact } = usePhoneCalls();
   const [daysSinceContact, setDaysSinceContact] = useState<number | null>(null);
 

@@ -3,7 +3,7 @@
  * Create freeform, step work, or meeting reflection entries
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Button, Card, Slider } from '../../components/ui';
+import { Card, Slider } from '../../components/ui';
 import { useJournalStore } from '../../lib/store';
 import { DEFAULT_EMOTIONS } from '../../lib/constants/emotions';
 import type { JournalType } from '../../lib/types';

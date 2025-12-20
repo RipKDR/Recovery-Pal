@@ -3,15 +3,16 @@
  * Handles voice journal recording with expo-audio
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
-  useAudioRecorder,
+  useAudioRecorder as useExpoAudioRecorder,
   useAudioPlayer,
   useAudioRecorderState,
-  useAudioPlayerState,
+  useAudioPlayerStatus,
   AudioModule,
   setAudioModeAsync,
   RecordingPresets,
+  type AudioMode,
 } from 'expo-audio';
 import * as ExpoFileSystem from 'expo-file-system';
 import { v4 as uuid } from 'uuid';
@@ -19,6 +20,7 @@ import { v4 as uuid } from 'uuid';
 // Type workaround for expo-file-system directory constants
 const FileSystem = ExpoFileSystem as typeof ExpoFileSystem & {
   documentDirectory: string | null;
+  cacheDirectory: string | null;
 };
 
 export interface RecordingState {
@@ -43,9 +45,29 @@ export interface PlaybackState {
 }
 
 // Directory for storing voice journals (use documentDirectory for persistent storage)
-const VOICE_JOURNAL_DIR = `${FileSystem.documentDirectory}voice-journals/`;
+const BASE_DIRECTORY =
+  FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '';
+const VOICE_JOURNAL_DIR = `${BASE_DIRECTORY}voice-journals/`;
 
-export function useAudioRecorder() {
+const AUDIO_MODE_BASE: Omit<AudioMode, 'allowsRecording'> = {
+  playsInSilentMode: true,
+  interruptionMode: 'duckOthers',
+  interruptionModeAndroid: 'duckOthers',
+  shouldPlayInBackground: false,
+  shouldRouteThroughEarpiece: false,
+};
+
+const RECORDING_AUDIO_MODE: AudioMode = {
+  ...AUDIO_MODE_BASE,
+  allowsRecording: true,
+};
+
+const PLAYBACK_AUDIO_MODE: AudioMode = {
+  ...AUDIO_MODE_BASE,
+  allowsRecording: false,
+};
+
+export function useVoiceRecorder() {
   const [recordingState, setRecordingState] = useState<RecordingState>({
     isRecording: false,
     isPaused: false,
@@ -64,12 +86,12 @@ export function useAudioRecorder() {
   const [playbackSource, setPlaybackSource] = useState<string | null>(null);
   
   // Create audio recorder instance
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const audioRecorder = useExpoAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder);
   
   // Create audio player - source is managed via state
   const audioPlayer = useAudioPlayer(playbackSource);
-  const playerState = useAudioPlayerState(audioPlayer);
+  const playerState = useAudioPlayerStatus(audioPlayer);
 
   // Initialize directory and permissions
   useEffect(() => {
@@ -81,20 +103,20 @@ export function useAudioRecorder() {
 
   // Sync recorder state
   useEffect(() => {
-    setRecordingState({
+    setRecordingState((prev) => ({
+      ...prev,
       isRecording: recorderState.isRecording,
-      isPaused: recorderState.isPaused ?? false,
       duration: Math.floor((recorderState.durationMillis ?? 0) / 1000),
-      metering: 0, // expo-audio doesn't provide metering in the same way
-    });
-  }, [recorderState.isRecording, recorderState.isPaused, recorderState.durationMillis]);
+      metering: recorderState.metering ?? 0,
+    }));
+  }, [recorderState.isRecording, recorderState.durationMillis, recorderState.metering]);
 
   // Sync player state
   useEffect(() => {
     if (playerState && playbackSource) {
       setPlaybackState({
-        isPlaying: playerState.isPlaying,
-        isPaused: !playerState.isPlaying && (playerState.currentTime ?? 0) > 0,
+        isPlaying: playerState.playing,
+        isPaused: !playerState.playing && (playerState.currentTime ?? 0) > 0,
         position: Math.floor((playerState.currentTime ?? 0) / 1000),
         duration: Math.floor((playerState.duration ?? 0) / 1000),
       });
@@ -108,7 +130,7 @@ export function useAudioRecorder() {
         }));
       }
     }
-  }, [playerState?.isPlaying, playerState?.currentTime, playerState?.duration, playerState?.didJustFinish, playbackSource]);
+  }, [playerState?.playing, playerState?.currentTime, playerState?.duration, playerState?.didJustFinish, playbackSource]);
 
   const initializeAudio = async () => {
     try {
@@ -125,13 +147,7 @@ export function useAudioRecorder() {
       setPermissionGranted(status.granted);
 
       // Configure audio mode
-      await setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
+      await setAudioModeAsync(RECORDING_AUDIO_MODE);
     } catch (error) {
       console.error('Failed to initialize audio:', error);
     }
@@ -165,10 +181,7 @@ export function useAudioRecorder() {
       }
 
       // Configure for recording
-      await setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
-      });
+      await setAudioModeAsync(RECORDING_AUDIO_MODE);
 
       // Prepare and start recording
       await audioRecorder.prepareToRecordAsync();
@@ -195,7 +208,7 @@ export function useAudioRecorder() {
 
   // Resume recording
   const resumeRecording = useCallback(async () => {
-    if (recorderState.isPaused) {
+    if (recordingState.isPaused) {
       try {
         await audioRecorder.record();
         setRecordingState((prev) => ({ ...prev, isPaused: false }));
@@ -203,7 +216,7 @@ export function useAudioRecorder() {
         console.error('Failed to resume recording:', error);
       }
     }
-  }, [audioRecorder, recorderState.isPaused]);
+  }, [audioRecorder, recordingState.isPaused]);
 
   // Stop recording and save
   const stopRecording = useCallback(async (): Promise<AudioFile | null> => {
@@ -211,7 +224,7 @@ export function useAudioRecorder() {
 
     try {
       await audioRecorder.stop();
-      const uri = audioRecorder.getURI();
+      const uri = audioRecorder.getStatus().url ?? audioRecorder.uri;
       
       if (!uri) return null;
 
@@ -241,10 +254,7 @@ export function useAudioRecorder() {
       });
 
       // Reset audio mode for playback
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-      });
+      await setAudioModeAsync(PLAYBACK_AUDIO_MODE);
 
       return audioFile;
     } catch (error) {
@@ -258,7 +268,7 @@ export function useAudioRecorder() {
     try {
       if (recorderState.isRecording) {
         await audioRecorder.stop();
-        const uri = audioRecorder.getURI();
+        const uri = audioRecorder.getStatus().url ?? audioRecorder.uri;
         if (uri) {
           await FileSystem.deleteAsync(uri, { idempotent: true });
         }
@@ -285,10 +295,7 @@ export function useAudioRecorder() {
       }
 
       // Configure for playback
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-      });
+      await setAudioModeAsync(PLAYBACK_AUDIO_MODE);
 
       // Set the source to trigger player to load
       setPlaybackSource(uri);
@@ -297,7 +304,6 @@ export function useAudioRecorder() {
       setTimeout(() => {
         audioPlayer.play();
       }, 100);
-
       return true;
     } catch (error) {
       console.error('Failed to play audio:', error);

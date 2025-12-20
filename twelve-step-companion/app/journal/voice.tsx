@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Card, Button, Slider } from '../../components/ui';
-import { useAudioRecorder } from '../../lib/hooks/useAudioRecorder';
+import { useVoiceRecorder } from '../../lib/hooks/useAudioRecorder';
 import { useJournalStore } from '../../lib/store';
 import { DEFAULT_EMOTIONS } from '../../lib/constants/emotions';
 
@@ -36,7 +36,7 @@ export default function VoiceJournalScreen() {
     resumePlayback,
     stopPlayback,
     formatDuration,
-  } = useAudioRecorder();
+  } = useVoiceRecorder();
 
   const { createEntry, isLoading } = useJournalStore();
 
@@ -356,8 +356,8 @@ export default function VoiceJournalScreen() {
           <Slider
             value={mood}
             onValueChange={setMood}
-            minimumValue={1}
-            maximumValue={10}
+            min={1}
+            max={10}
             step={1}
           />
 

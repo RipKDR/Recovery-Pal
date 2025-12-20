@@ -16,6 +16,15 @@ const AES_KEY_LENGTH = 32; // 256 bits
 const IV_LENGTH = 12; // 96 bits recommended for GCM
 const AUTH_TAG_LENGTH = 16; // 128 bits
 
+function assertWebCryptoAvailable() {
+  const subtle = (globalThis.crypto as any)?.subtle;
+  if (!subtle) {
+    throw new Error(
+      'WebCrypto is unavailable. Ensure polyfills.ts/js loads expo-standard-web-crypto before app initialization.'
+    );
+  }
+}
+
 /**
  * Generate a new encryption key if one doesn't exist
  * Key is stored in secure storage with biometric protection
@@ -106,14 +115,22 @@ function base64ToBytes(base64: string): Uint8Array {
   return bytes;
 }
 
+// Ensure we always pass a concrete ArrayBuffer (copy to avoid ArrayBufferLike issues)
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.length);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 /**
  * Import key for Web Crypto API
  */
 async function importKey(keyHex: string): Promise<CryptoKey> {
+  assertWebCryptoAvailable();
   const keyBytes = hexToBytes(keyHex);
   return await crypto.subtle.importKey(
     'raw',
-    keyBytes,
+    toArrayBuffer(keyBytes),
     { name: 'AES-GCM' },
     false,
     ['encrypt', 'decrypt']
@@ -127,6 +144,7 @@ async function importKey(keyHex: string): Promise<CryptoKey> {
  * @returns Base64 encoded string: version(1) + iv(12) + ciphertext + authTag(16)
  */
 async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string> {
+  assertWebCryptoAvailable();
   // Generate random IV
   const ivBytes = await Crypto.getRandomBytesAsync(IV_LENGTH);
   const iv = new Uint8Array(ivBytes);
@@ -136,6 +154,7 @@ async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string>
   
   // Encrypt
   const plaintextBytes = stringToBytes(plaintext);
+  const plaintextBuffer = toArrayBuffer(plaintextBytes);
   const ciphertextWithTag = await crypto.subtle.encrypt(
     {
       name: 'AES-GCM',
@@ -143,7 +162,7 @@ async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string>
       tagLength: AUTH_TAG_LENGTH * 8, // bits
     },
     cryptoKey,
-    plaintextBytes
+    plaintextBuffer
   );
   
   // Combine: version (1 byte) + iv (12 bytes) + ciphertext + authTag
@@ -162,6 +181,7 @@ async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string>
  * @returns Decrypted plaintext
  */
 async function aesGcmDecrypt(ciphertext: string, keyHex: string): Promise<string> {
+  assertWebCryptoAvailable();
   const combined = base64ToBytes(ciphertext);
   
   // Extract components
@@ -184,7 +204,7 @@ async function aesGcmDecrypt(ciphertext: string, keyHex: string): Promise<string
       tagLength: AUTH_TAG_LENGTH * 8,
     },
     cryptoKey,
-    encryptedData
+    toArrayBuffer(encryptedData)
   );
   
   return bytesToString(new Uint8Array(decrypted));

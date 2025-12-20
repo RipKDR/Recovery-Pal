@@ -3,7 +3,7 @@
  * Positive recovery affirmations with personalization
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Card, Button } from '../components/ui';
+import { Card } from '../components/ui';
 import { useSobriety } from '../lib/hooks/useSobriety';
 
 const { width } = Dimensions.get('window');
@@ -73,7 +73,7 @@ const CATEGORY_INFO = {
 
 export default function AffirmationsScreen() {
   const router = useRouter();
-  const { soberDays, profile } = useSobriety();
+  const { soberDays } = useSobriety();
   
   const [selectedCategory, setSelectedCategory] = useState<Affirmation['category'] | 'all'>('all');
   const [currentIndex, setCurrentIndex] = useState(0);

@@ -3,11 +3,12 @@
  * Manage sponsor/sponsee connections for limited data sharing
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Share, Clipboard } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { Button } from '../components/ui';
 import { useContactStore } from '../lib/store';
 import { useSobriety } from '../lib/hooks/useSobriety';
@@ -83,8 +84,8 @@ function SponseeView() {
   const { sponsor } = useContactStore();
   const { profile, soberDays } = useSobriety();
   const { checkinStreak, averageMood, averageCraving, todayCheckin } = useCheckin();
-  const { logs: meetingLogs } = useMeetings();
-  const { stepProgress } = useStepWorkStore();
+  const { meetings: meetingLogs } = useMeetings();
+  const { progress: stepProgress } = useStepWorkStore();
 
   // Load existing code on mount
   useEffect(() => {
@@ -114,10 +115,14 @@ function SponseeView() {
     }
   };
 
-  const handleCopyCode = () => {
-    if (connectionCode) {
-      Clipboard.setString(connectionCode.code);
+  const handleCopyCode = async () => {
+    if (!connectionCode) return;
+
+    try {
+      await Clipboard.setStringAsync(connectionCode.code);
       Alert.alert('Copied!', 'Connection code copied to clipboard.');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to copy code. Please try again.');
     }
   };
 
@@ -143,15 +148,15 @@ function SponseeView() {
     setIsSharing(true);
     try {
       // Calculate current step
-      const currentStep = stepProgress.find(p => p.answeredQuestions < p.totalQuestions)?.stepNumber || 1;
+      const currentStep = stepProgress.find(p => p.questionsAnswered < p.totalQuestions)?.stepNumber || 1;
       
       // Calculate meetings this week
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       const meetingsThisWeek = meetingLogs.filter(
-        m => new Date(m.date) >= oneWeekAgo
+        (m) => new Date(m.attendedAt) >= oneWeekAgo
       ).length;
-      
+
       // Get last meeting date
       const lastMeeting = meetingLogs[0];
       
@@ -166,7 +171,7 @@ function SponseeView() {
           checkinStreak,
           currentStep,
           meetingsThisWeek,
-          lastMeetingDate: lastMeeting?.date,
+          lastMeetingDate: lastMeeting?.attendedAt,
           averageMoodLast7Days: averageMood || undefined,
           averageCravingLast7Days: averageCraving || undefined,
         }
@@ -386,7 +391,7 @@ function SponsorView() {
                 'Enter the code your sponsee shared (e.g., RC-ABC123)',
                 [
                   { text: 'Cancel', style: 'cancel' },
-                  { text: 'OK', onPress: (text) => text && setNewCode(text) },
+                  { text: 'OK', onPress: (text?: string) => text && setNewCode(text) },
                 ],
                 'plain-text',
                 newCode
@@ -409,7 +414,7 @@ function SponsorView() {
                 'Enter your sponsee\'s name',
                 [
                   { text: 'Cancel', style: 'cancel' },
-                  { text: 'OK', onPress: (text) => text && setNewName(text) },
+                  { text: 'OK', onPress: (text?: string) => text && setNewName(text) },
                 ],
                 'plain-text',
                 newName

@@ -91,9 +91,9 @@ export default function BreathingScreen() {
   useEffect(() => {
     if (!isActive || !selectedPattern) return;
 
-    // Track all timeouts for proper cleanup
-    const timeoutIds: NodeJS.Timeout[] = [];
-    let intervalId: NodeJS.Timeout;
+    // Track all timeouts/intervals for proper cleanup
+    const timeoutIds: ReturnType<typeof setTimeout>[] = [];
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const runPhase = (phaseName: BreathingPhase, duration: number) => {
       setPhase(phaseName);
@@ -103,7 +103,9 @@ export default function BreathingScreen() {
       intervalId = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
-            clearInterval(intervalId);
+            if (intervalId) {
+              clearInterval(intervalId);
+            }
             return 0;
           }
           return prev - 1;
@@ -166,7 +168,9 @@ export default function BreathingScreen() {
       // Hold In (if any)
       if (holdIn > 0) {
         timeoutIds.push(setTimeout(() => {
-          clearInterval(intervalId);
+          if (intervalId) {
+            clearInterval(intervalId);
+          }
           runPhase('hold-in', holdIn);
         }, delay));
         delay += holdIn * 1000;
@@ -174,7 +178,9 @@ export default function BreathingScreen() {
 
       // Exhale
       timeoutIds.push(setTimeout(() => {
-        clearInterval(intervalId);
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
         runPhase('exhale', exhale);
       }, delay));
       delay += exhale * 1000;
@@ -182,7 +188,9 @@ export default function BreathingScreen() {
       // Hold Out (if any)
       if (holdOut > 0) {
         timeoutIds.push(setTimeout(() => {
-          clearInterval(intervalId);
+          if (intervalId) {
+            clearInterval(intervalId);
+          }
           runPhase('hold-out', holdOut);
         }, delay));
         delay += holdOut * 1000;
@@ -190,7 +198,9 @@ export default function BreathingScreen() {
 
       // Next cycle
       timeoutIds.push(setTimeout(() => {
-        clearInterval(intervalId);
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
         runCycle(cycleNum + 1);
       }, delay));
     };
@@ -200,7 +210,9 @@ export default function BreathingScreen() {
     return () => {
       // Clear ALL timeouts to prevent memory leaks
       timeoutIds.forEach(id => clearTimeout(id));
-      clearInterval(intervalId);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
       if (animationRef.current) {
         animationRef.current.stop();
       }

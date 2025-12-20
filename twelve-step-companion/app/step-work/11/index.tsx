@@ -32,7 +32,8 @@ export default function EleventhStepScreen() {
   const [showPrayer, setShowPrayer] = useState<string | null>(null);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // Use the browser Timeout type to avoid Node-only typings when targeting native
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Meditation pulse animation
   useEffect(() => {

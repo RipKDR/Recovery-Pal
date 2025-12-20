@@ -13,6 +13,7 @@
 
 // Uncomment when Sentry is installed:
 // import * as Sentry from '@sentry/react-native';
+import React from 'react';
 
 interface ErrorContext {
   component?: string;
@@ -186,6 +187,31 @@ export function startTransaction(
  * Wrap a component with error boundary
  * Use this for critical components
  */
+class SimpleErrorBoundary extends React.Component<
+  { fallback?: React.ReactNode; children?: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { fallback?: React.ReactNode; children?: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown, errorInfo: unknown): void {
+    console.error('[ErrorTracking] Error boundary caught error:', error, errorInfo);
+  }
+
+  render(): React.ReactNode {
+    if (this.state.hasError) {
+      return this.props.fallback ?? React.createElement(ErrorFallback);
+    }
+    return this.props.children ?? null;
+  }
+}
+
 export function withErrorBoundary<P extends object>(
   Component: React.ComponentType<P>,
   fallback?: React.ReactNode
@@ -195,16 +221,29 @@ export function withErrorBoundary<P extends object>(
   //   fallback: fallback || <ErrorFallback />,
   // });
 
-  // Fallback when Sentry is not installed - just return the component
-  return Component;
+  // Fallback when Sentry is not installed - wrap in a simple boundary
+  const WithBoundary: React.ComponentType<P> = (props: P) =>
+    React.createElement(
+      SimpleErrorBoundary,
+      { fallback: fallback ?? React.createElement(ErrorFallback) },
+      React.createElement(Component, props)
+    );
+
+  WithBoundary.displayName = `WithErrorBoundary(${Component.displayName || Component.name || 'Component'})`;
+  return WithBoundary;
 }
 
 /**
  * Error boundary fallback component
  */
-export function ErrorFallback(): JSX.Element {
-  // This is a placeholder - implement a proper fallback UI
-  return null as unknown as JSX.Element;
+export function ErrorFallback(): React.ReactElement {
+  // Basic fallback UI - can be improved as needed
+  return React.createElement(
+    'div',
+    { style: { padding: 24, textAlign: 'center', color: '#a00' } },
+    React.createElement('h2', null, 'Something went wrong.'),
+    React.createElement('p', null, 'An unexpected error has occurred. Please try again later.')
+  );
 }
 
 /**

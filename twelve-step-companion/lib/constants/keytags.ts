@@ -127,15 +127,17 @@ export function getNextKeytag(days: number): Keytag | null {
 /**
  * Get all keytags with status based on days clean
  */
-export function getKeytagsWithStatus(days: number, earnedDates?: Record<string, Date>): KeytagWithStatus[] {
+export function getKeytagsWithStatus(
+  days: number,
+  earnedDates?: Record<string, Date>
+): KeytagWithStatus[] {
   return KEYTAGS.map((keytag) => {
     const isEarned = days >= keytag.days;
     const earnedAt = earnedDates?.[keytag.id];
-    
-    // Calculate progress to next milestone
+
     let progress = 0;
     let daysUntil = 0;
-    
+
     if (!isEarned) {
       const previousKeytag = KEYTAGS.filter((k) => k.days < keytag.days).pop();
       const previousDays = previousKeytag?.days || 0;

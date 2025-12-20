@@ -10,6 +10,7 @@ import { useCheckin } from './useCheckin';
 import { useContactStore, useMeetingStore, useRhythmStore, useStepWorkStore } from '../store';
 import { runJitaiEvaluation, resetCooldowns, getCooldownStatus } from '../jitai/engine';
 import type { JitaiContext } from '../jitai/types';
+import type { MeetingLog } from '../types';
 
 // Minimum interval between evaluations (5 minutes)
 const MIN_EVALUATION_INTERVAL_MS = 5 * 60 * 1000;
@@ -22,20 +23,19 @@ export function useJitai() {
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   
   // Get app state from various stores
-  const { soberDays, profile } = useSobriety();
+  const { soberDays } = useSobriety();
   const { 
     todayCheckin, 
-    checkinStreak, 
     averageMood, 
     averageCraving,
     moodTrend,
     cravingTrend,
     history: checkinHistory,
   } = useCheckin();
-  const { sponsor, contacts } = useContactStore();
-  const { logs: meetingLogs } = useMeetingStore();
+  const { sponsor } = useContactStore();
+  const meetings = useMeetingStore((state) => state.meetings ?? []);
   const { todayIntention, todayInventory } = useRhythmStore();
-  const { stepProgress } = useStepWorkStore();
+  const stepProgress = useStepWorkStore((state) => state.progress ?? []);
 
   /**
    * Build JITAI context from current app state
@@ -54,8 +54,8 @@ export function useJitai() {
     
     // Calculate days since last meeting
     let daysSinceLastMeeting = 999;
-    if (meetingLogs.length > 0) {
-      const lastMeeting = new Date(meetingLogs[0].date);
+    if (meetings.length > 0) {
+      const lastMeeting = new Date(meetings[0].attendedAt);
       daysSinceLastMeeting = Math.floor(
         (now.getTime() - lastMeeting.getTime()) / (24 * 60 * 60 * 1000)
       );
@@ -64,8 +64,8 @@ export function useJitai() {
     // Calculate meetings this week
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const meetingsThisWeek = meetingLogs.filter(
-      log => new Date(log.date) >= oneWeekAgo
+    const meetingsThisWeek = meetings.filter(
+      (log: MeetingLog) => new Date(log.attendedAt) >= oneWeekAgo
     ).length;
     
     // Calculate days since last sponsor contact
@@ -77,7 +77,8 @@ export function useJitai() {
     }
     
     // Get current step
-    const currentStep = stepProgress.find(p => p.answeredQuestions < p.totalQuestions)?.stepNumber || 1;
+    const currentStep =
+      stepProgress.find((p) => p.questionsAnswered < p.totalQuestions)?.stepNumber || 1;
     
     // Calculate days since last step work
     let daysSinceLastStepWork = 999;
@@ -121,14 +122,13 @@ export function useJitai() {
   }, [
     soberDays,
     todayCheckin,
-    checkinStreak,
     averageMood,
     averageCraving,
     moodTrend,
     cravingTrend,
     checkinHistory,
     sponsor,
-    meetingLogs,
+    meetings,
     todayIntention,
     todayInventory,
     stepProgress,

@@ -9,6 +9,7 @@ import { useSobriety } from './useSobriety';
 import { useCheckin } from './useCheckin';
 import { useContactStore, useMeetingStore, useRegularMeetingStore, useStepWorkStore } from '../store';
 import { getReadingStreak } from '../db/models';
+import type { StepProgress, MeetingLog } from '../types';
 
 /**
  * Hook for managing and checking achievements
@@ -39,9 +40,9 @@ export function useAchievements() {
   const { soberDays } = useSobriety();
   const { checkinStreak } = useCheckin();
   const { contacts } = useContactStore();
-  const { logs: meetingLogs } = useMeetingStore();
+  const { meetings } = useMeetingStore();
   const { meetings: regularMeetings } = useRegularMeetingStore();
-  const { stepProgress } = useStepWorkStore();
+  const { progress } = useStepWorkStore();
 
   // Initialize achievements on mount
   useEffect(() => {
@@ -69,18 +70,13 @@ export function useAchievements() {
     const hasHomeGroup = regularMeetings.some(m => m.isHomeGroup);
     
     // Count meetings
-    const meetingsCount = meetingLogs.length;
+    const meetingsCount = meetings.length;
     
     // Calculate meetings in first 90 days (if applicable)
     let meetingsInFirst90Days = 0;
     if (soberDays >= 90) {
-      // This would need the sobriety start date to calculate properly
-      // For now, we'll use a simplified approach
-      meetingsInFirst90Days = meetingLogs.filter((log) => {
-        // Check if meeting was logged in first 90 days
-        // This is a simplified check
-        return true;
-      }).length;
+      // Placeholder: assume all logged meetings count until start-date tracking is added
+      meetingsInFirst90Days = meetings.length;
     }
     
     // Get reading streak
@@ -94,10 +90,10 @@ export function useAchievements() {
     // Calculate step progress
     const stepProgressMap: Record<number, { answered: number; total: number }> = {};
     for (let step = 1; step <= 12; step++) {
-      const progress = stepProgress.find(p => p.stepNumber === step);
+      const stepEntry = progress.find((p: StepProgress) => p.stepNumber === step);
       stepProgressMap[step] = {
-        answered: progress?.answeredQuestions || 0,
-        total: progress?.totalQuestions || 10, // Default to 10 questions per step
+        answered: stepEntry?.questionsAnswered || 0,
+        total: stepEntry?.totalQuestions || 10, // Default to 10 questions per step
       };
     }
     
@@ -106,7 +102,7 @@ export function useAchievements() {
     const phoneTherapyDays = 0; // TODO: Implement from phone call logs
     
     // Count meetings with shares
-    const meetingsWithShares = meetingLogs.filter(m => m.didShare).length;
+    const meetingsWithShares = meetings.filter((m: MeetingLog) => m.didShare).length;
     
     // Tenth step streak - would need to track nightly reviews
     const tenthStepStreak = 0; // TODO: Implement from tiny inventory or tenth step reviews
@@ -129,7 +125,7 @@ export function useAchievements() {
       stepProgress: stepProgressMap,
       meetingsWithShares,
     };
-  }, [soberDays, contacts, meetingLogs, regularMeetings, checkinStreak, stepProgress]);
+  }, [soberDays, contacts, meetings, regularMeetings, checkinStreak, progress]);
 
   /**
    * Check all automatic achievements

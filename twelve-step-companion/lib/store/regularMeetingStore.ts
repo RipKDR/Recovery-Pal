@@ -27,7 +27,6 @@ import {
   scheduleRegularMeetingReminder,
   cancelRegularMeetingReminder,
   scheduleAllMeetingReminders,
-  cancelAllMeetingReminders,
 } from '../notifications/meetingReminders';
 
 interface RegularMeetingState {

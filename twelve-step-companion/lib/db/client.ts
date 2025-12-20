@@ -62,10 +62,11 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
  * Initialize database with schema
  */
 export async function initializeDatabase(): Promise<void> {
-  const database = await getDatabase();
+  try {
+    const database = await getDatabase();
 
-  // Create all tables
-  await database.execAsync(`
+    // Create all tables
+    await database.execAsync(`
     -- Sobriety Profile
     CREATE TABLE IF NOT EXISTS sobriety_profile (
       id TEXT PRIMARY KEY,
@@ -393,8 +394,11 @@ export async function initializeDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_phone_logs_contact ON phone_call_logs(contact_id);
   `);
 
-  // Run versioned migrations for existing databases
-  await runMigrations(database);
+    // Run versioned migrations for existing databases
+    await runMigrations(database);
+  } catch (error) {
+    throw error;
+  }
 }
 
 // Current schema version - increment when adding new migrations

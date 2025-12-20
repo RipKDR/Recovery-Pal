@@ -32,6 +32,7 @@ interface StepWorkState {
   getAnswer: (stepNumber: number, questionIndex: number) => StepAnswer | undefined;
   getDecryptedAnswer: (stepNumber: number, questionIndex: number) => Promise<string | null>;
   initializeStepProgress: () => Promise<void>;
+  updateProgressFromAnswers: (stepNumber: number) => Promise<void>;
 }
 
 export const useStepWorkStore = create<StepWorkState>((set, get) => ({

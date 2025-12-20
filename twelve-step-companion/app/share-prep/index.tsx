@@ -3,7 +3,7 @@
  * Prepare notes before sharing at a meeting
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,

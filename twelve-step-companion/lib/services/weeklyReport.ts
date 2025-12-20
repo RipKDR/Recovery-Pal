@@ -4,7 +4,6 @@
  */
 
 import { getCheckinHistory, getReadingStreak, getPhoneCallLogs } from '../db/models';
-import { decryptContent } from '../encryption';
 
 /**
  * Weekly report data structure

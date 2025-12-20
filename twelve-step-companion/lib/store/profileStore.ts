@@ -37,21 +37,12 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   soberMinutes: 0,
 
   loadProfile: async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/store/profileStore.ts:39',message:'loadProfile started',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'store-load',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     set({ isLoading: true, error: null });
     try {
       const profile = await getSobrietyProfile();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/store/profileStore.ts:42',message:'Profile loaded from DB',data:{hasProfile:!!profile,profileId:profile?.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'store-load',hypothesisId:'G'})}).catch(()=>{});
-      // #endregion
       set({ profile, isLoading: false });
       get().calculateSobriety();
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/15ebcf9c-eb72-40e3-a06e-312b404b3713',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/store/profileStore.ts:45',message:'loadProfile error',data:{error:error instanceof Error?error.message:String(error),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'store-load',hypothesisId:'G'})}).catch(()=>{});
-      // #endregion
       set({ error: 'Failed to load profile', isLoading: false });
     }
   },

@@ -38,7 +38,6 @@ export default function AchievementsScreen() {
     totalAchievements,
     earnedKeytags,
     totalKeytags,
-    overallProgress,
     categoryProgress,
     recentUnlock,
     dismissRecentUnlock,
@@ -48,6 +47,10 @@ export default function AchievementsScreen() {
 
   const [selectedKeytag, setSelectedKeytag] = useState<KeytagWithStatus | null>(null);
   const [activeTab, setActiveTab] = useState<CategoryTab>('all');
+
+  const overallProgress = Math.round(
+    ((totalUnlocked + earnedKeytags) / Math.max(totalAchievements + totalKeytags, 1)) * 100
+  );
 
   const handleKeytagPress = useCallback((keytag: KeytagWithStatus) => {
     setSelectedKeytag(keytag);

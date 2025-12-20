@@ -32,6 +32,12 @@
             "NSPrivacyAccessedAPITypeReasons": [
               "CA92.1"
             ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ],
         "NSPrivacyCollectedDataTypes": [],
@@ -48,6 +54,11 @@
       "package": "com.recoverycompanion.app",
       "versionCode": 1,
       "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
         "android.permission.RECORD_AUDIO",
@@ -92,18 +103,20 @@
     "experiments": {
       "typedRoutes": true
     },
-    "extra": {
-      "eas": {
-        "projectId": "0d7f3eb6-afef-4a26-ba85-fb18459927db"
-      },
-      "router": {}
-    },
+    "router": {},
     "owner": "ripkdr",
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "enabled": false
+      "enabled": false,
+      "url": "https://u.expo.dev/0d7f3eb6-afef-4a26-ba85-fb18459927db"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0d7f3eb6-afef-4a26-ba85-fb18459927db"
+      }
     }
   }
 }

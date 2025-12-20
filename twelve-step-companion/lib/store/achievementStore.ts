@@ -8,7 +8,6 @@ import {
   initializeAchievements,
   getAchievements,
   getAchievementById,
-  getAchievementsByCategory as getAchievementsByCategoryFromDb,
   updateAchievementProgress,
   unlockAchievement as unlockAchievementInDb,
   saveAchievementReflection,
@@ -90,15 +89,15 @@ export const useAchievementStore = create<AchievementState & AchievementActions>
 
   initialize: async () => {
     if (get().isInitialized) return;
-    
+
     set({ isLoading: true });
     try {
       // Initialize achievements in database
       await initializeAchievements();
-      
+
       // Load achievements
       await get().loadAchievements();
-      
+
       set({ isInitialized: true, isLoading: false });
     } catch (error) {
       console.error('Failed to initialize achievements:', error);
@@ -148,7 +147,7 @@ export const useAchievementStore = create<AchievementState & AchievementActions>
   updateKeytagsForDays: (days: number) => {
     const keytags = getKeytagsWithStatus(days);
     const earnedKeytags = getEarnedKeytagsCount(days);
-    
+
     set((state) => ({
       keytags,
       earnedKeytags,
@@ -167,7 +166,7 @@ export const useAchievementStore = create<AchievementState & AchievementActions>
       if (achievement.status === 'unlocked') continue;
 
       const shouldUnlock = checkAchievementCondition(achievement, context);
-      
+
       if (shouldUnlock) {
         const updated = await unlockAchievementInDb(achievement.id);
         if (updated) {
@@ -185,7 +184,7 @@ export const useAchievementStore = create<AchievementState & AchievementActions>
     // Reload achievements if any were updated
     if (newlyUnlocked.length > 0) {
       await get().loadAchievements();
-      
+
       // Set the most recent unlock for celebration
       set({ recentUnlock: newlyUnlocked[newlyUnlocked.length - 1] });
     }
@@ -196,13 +195,13 @@ export const useAchievementStore = create<AchievementState & AchievementActions>
   selfCheckAchievement: async (id: string) => {
     try {
       const achievement = await getAchievementById(id);
-      
+
       if (!achievement || achievement.unlockType !== 'self_check') {
         return null;
       }
 
       const updated = await unlockAchievementInDb(id);
-      
+
       if (updated) {
         await get().loadAchievements();
         set({ recentUnlock: updated });
@@ -270,20 +269,20 @@ function checkAchievementCondition(
   switch (unlockType) {
     case 'automatic':
       return checkAutomaticAchievement(id, context);
-    
+
     case 'count':
       return checkCountAchievement(id, target || 0, context);
-    
+
     case 'streak':
       return checkStreakAchievement(id, target || 0, context);
-    
+
     case 'progressive':
       const progress = getProgressiveProgress(id, context);
       return progress >= (target || 100);
-    
+
     case 'self_check':
       return false; // Self-check achievements are never auto-unlocked
-    
+
     default:
       return false;
   }
@@ -296,16 +295,16 @@ function checkAutomaticAchievement(id: string, context: AchievementContext): boo
   switch (id) {
     case 'fellowship-newcomer':
       return context.soberDays >= 0;
-    
+
     case 'fellowship-home-group':
       return context.hasHomeGroup;
-    
+
     case 'fellowship-sponsor':
       return context.hasSponsor;
-    
+
     case 'fellowship-90-in-90':
       return context.soberDays >= 90 && (context.meetingsInFirst90Days || 0) >= 90;
-    
+
     default:
       return false;
   }
@@ -318,28 +317,28 @@ function checkCountAchievement(id: string, target: number, context: AchievementC
   switch (id) {
     case 'fellowship-first-contact':
       return context.contactsCount >= target;
-    
+
     case 'fellowship-building-network':
       return context.contactsCount >= target;
-    
+
     case 'fellowship-connected':
       return context.contactsCount >= target;
-    
+
     case 'service-first-meeting':
       return context.meetingsCount >= target;
-    
+
     case 'service-10-meetings':
       return context.meetingsCount >= target;
-    
+
     case 'service-50-meetings':
       return context.meetingsCount >= target;
-    
+
     case 'service-100-meetings':
       return context.meetingsCount >= target;
-    
+
     case 'practice-phone-therapy':
       return context.phoneTherapyDays >= target;
-    
+
     default:
       return false;
   }
@@ -354,20 +353,20 @@ function checkStreakAchievement(id: string, target: number, context: Achievement
     case 'practice-reader-30':
     case 'practice-reader-90':
       return context.readingStreak >= target;
-    
+
     case 'practice-checkin-7':
     case 'practice-checkin-30':
     case 'practice-checkin-90':
       return context.checkinStreak >= target;
-    
+
     case 'practice-nightly-review-7':
     case 'practice-nightly-review-30':
       return context.tenthStepStreak >= target;
-    
+
     case 'practice-gratitude-7':
     case 'practice-gratitude-30':
       return context.gratitudeStreak >= target;
-    
+
     default:
       return false;
   }
@@ -384,10 +383,10 @@ function getProgressiveProgress(id: string, context: AchievementContext): number
   const stepNumber = parseInt(match[1], 10);
   const type = match[2];
   const stepData = context.stepProgress[stepNumber];
-  
+
   if (!stepData) return 0;
 
-  const percentage = stepData.total > 0 
+  const percentage = stepData.total > 0
     ? Math.round((stepData.answered / stepData.total) * 100)
     : 0;
 
@@ -411,13 +410,13 @@ function getAchievementProgress(
   switch (unlockType) {
     case 'count':
       return getCountProgress(id, context);
-    
+
     case 'streak':
       return getStreakProgress(id, context);
-    
+
     case 'progressive':
       return getProgressiveProgress(id, context);
-    
+
     default:
       return null;
   }
@@ -432,16 +431,16 @@ function getCountProgress(id: string, context: AchievementContext): number {
     case 'fellowship-building-network':
     case 'fellowship-connected':
       return context.contactsCount;
-    
+
     case 'service-first-meeting':
     case 'service-10-meetings':
     case 'service-50-meetings':
     case 'service-100-meetings':
       return context.meetingsCount;
-    
+
     case 'practice-phone-therapy':
       return context.phoneTherapyDays;
-    
+
     default:
       return 0;
   }
@@ -456,20 +455,20 @@ function getStreakProgress(id: string, context: AchievementContext): number {
     case 'practice-reader-30':
     case 'practice-reader-90':
       return context.readingStreak;
-    
+
     case 'practice-checkin-7':
     case 'practice-checkin-30':
     case 'practice-checkin-90':
       return context.checkinStreak;
-    
+
     case 'practice-nightly-review-7':
     case 'practice-nightly-review-30':
       return context.tenthStepStreak;
-    
+
     case 'practice-gratitude-7':
     case 'practice-gratitude-30':
       return context.gratitudeStreak;
-    
+
     default:
       return 0;
   }
