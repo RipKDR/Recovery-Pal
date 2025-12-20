@@ -16,7 +16,7 @@ todos:
     status: in_progress
   - id: bmad-story-tests
     content: "Story 2 (SM/Dev): Run `npm test` (jest-expo) and capture results"
-    status: pending
+    status: completed
 ---
 
 # Local Run Readiness Plan (BMAD)

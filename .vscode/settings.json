@@ -1,0 +1,18 @@
+{
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "cmake.sourceDirectory": "C:/Users/laine/twelve-step-companion/node_modules/expo-modules-core/android",
+    "java.compile.nullAnalysis.mode": "automatic",
+    "typescript.tsdk": "node_modules\\typescript\\lib",
+    "C_Cpp.errorSquiggles": "enabled",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/node_modules/react-native/ReactCommon",
+        "${workspaceFolder}/node_modules/react-native/ReactCommon/jsi",
+        "${workspaceFolder}/node_modules/react-native/ReactCommon/cxxreact",
+        "${workspaceFolder}/node_modules/react-native/ReactCommon/jsiexecutor",
+        "${workspaceFolder}/node_modules/react-native/ReactCommon/react",
+        "${workspaceFolder}/node_modules/react-native-worklets/Common/cpp"
+    ],
+    "files.associations": {
+        "*.h": "cpp"
+    }
+}
